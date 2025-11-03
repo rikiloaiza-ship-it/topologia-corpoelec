@@ -337,6 +337,28 @@
         console.log('Nodo clickeado:', d);
       });
 
+      cy.on('mouseover', 'node', function(evt) {
+        const node = evt.target;
+        const deviceId = node.data('id');
+        API.getPorts(deviceId).then(ports => {
+          if (ports.length === 0) return;
+          const tooltipContent = ports.map(p => `${p.name} (${p.type}): ${p.status === 'available' ? 'Disponible' : 'Usado'}`).join('<br>');
+          node.qtip({
+            content: { text: tooltipContent },
+            position: { my: 'bottom center', at: 'top center' },
+            style: { classes: 'qtip-bootstrap' },
+            show: { event: false },
+            hide: { event: false }
+          });
+          node.qtip('show');
+        }).catch(err => console.warn('Error cargando puertos para tooltip:', err));
+      });
+      
+      cy.on('mouseout', 'node', function(evt) {
+        const node = evt.target;
+        node.qtip('destroy');
+      });
+
       cy.on('cxttap', 'node', ev => {
         ev.originalEvent.preventDefault();
         document.dispatchEvent(new CustomEvent('node:contextmenu', { 
@@ -346,6 +368,12 @@
             clientY: ev.originalEvent.clientY 
           } 
         }));
+        const connectPortsOption = {
+          content: 'Conectar Puertos',
+          select: function() {
+            document.dispatchEvent(new CustomEvent('node:connectPorts', { detail: { node: ev.target.data() } }));
+          }
+        };
       });
       
       cy.on('cxttap', 'edge', ev => {
@@ -379,7 +407,13 @@
             console.error('Error guardando posición:', err);
           });
       });
-  
+
+      cy.on('node:connectPorts', function(evt) {
+        const nodeData = evt.detail.node;
+        if (nodeData && nodeData.id) {
+          document.dispatchEvent(new CustomEvent('node:connectPorts', { detail: { node: nodeData } }));
+        }
+      });
       instances.set(containerId, cy);
     }
     return cy;

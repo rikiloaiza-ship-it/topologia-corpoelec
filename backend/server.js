@@ -39,6 +39,7 @@ app.use('/api/networks', networksRouter);
 app.use('/api/devices', devicesRouter);
 app.use('/api/connections', connectionsRouter);
 app.use('/api/images', imagesRouter);
+app.use('/api/ports', require('./routes/ports.routes.js'));
 
 // Healthcheck con verificación de DB
 app.get('/health', async (_req, res) => {
