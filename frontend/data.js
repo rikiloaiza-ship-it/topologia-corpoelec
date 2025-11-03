@@ -86,38 +86,5 @@
     if (!res.ok) throw new Error('Error eliminando conexión');
     return res.json();
   }
-  
-  async function createPort(data) {
-    const res = await Auth.apiFetch('/ports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-    if (!res.ok) throw new Error('Error creando puerto');
-    return res.json();
-  }
-
-  async function getAvailablePorts(deviceId) {
-    const res = await Auth.apiFetch(`/ports/available/${deviceId}`);
-    if (!res.ok) throw new Error('Error obteniendo puertos disponibles');
-    const json = await res.json();
-    return json.data;
-  }
-
-  async function getPorts(deviceId) {
-    const res = await Auth.apiFetch(`/ports?device_id=${deviceId}`);
-    if (!res.ok) throw new Error('Error obteniendo puertos');
-    const json = await res.json();
-    return json.data;
-  }
-  
-  async function updatePort(id, data) {
-    const res = await Auth.apiFetch(`/ports/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-    if (!res.ok) throw new Error('Error actualizando puerto');
-    return res.json();
-  }
-  
-  async function deletePort(id) {
-    const res = await Auth.apiFetch(`/ports/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('Error eliminando puerto');
-    return res.json();
-  }
-
-  global.API = { getDevices, getConnections, getGraph, createDevice, updateDevice, deleteDevice, createConnection, updateConnection, deleteConnection, getDevice, getConnection, getPorts, createPort, updatePort, deletePort,getAvailablePorts };
+  global.API = { getDevices, getConnections, getGraph, createDevice, updateDevice, deleteDevice, createConnection, updateConnection, deleteConnection, getDevice, getConnection, };
 })(window);

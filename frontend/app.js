@@ -184,12 +184,12 @@
   }
 
   function bindContextMenuActions() {
-    const menu = document.getElementById('context-menu');  // Define menu aquí para todo el scope
     const editBtn = document.getElementById('edit-btn');
     const deleteBtn = document.getElementById('delete-btn');
-  
+
     if (editBtn) {
       editBtn.addEventListener('click', async function() {
+        const menu = document.getElementById('context-menu');
         const type = menu?.dataset?.type;
         const id = menu?.dataset?.id;
         hideContextMenu();
@@ -197,11 +197,11 @@
           alert('Tipo o ID no definidos en el menú de contexto');
           return;
         }
-  
+
         if (type === 'device') {
           try {
             const device = await API.getDevice(id);  
-            await openDeviceModal(device);  // Agrega await aquí para consistencia
+            openDeviceModal(device);
           } catch (err) {
             alert('Error obteniendo dispositivo: ' + err.message);
           }
@@ -215,9 +215,10 @@
         }
       });
     }
-  
+
     if (deleteBtn) {
       deleteBtn.addEventListener('click', async function() {
+        const menu = document.getElementById('context-menu');
         const type = menu?.dataset?.type;
         const id = menu?.dataset?.id;
         hideContextMenu();
@@ -241,23 +242,9 @@
         }
       });
     }
-  
-    const connectPortsBtn = document.createElement('button');
-    connectPortsBtn.id = 'connect-ports-btn';
-    connectPortsBtn.textContent = 'Conectar Puertos';
-    connectPortsBtn.addEventListener('click', async function() {
-      const type = menu?.dataset?.type;
-      const id = menu?.dataset?.id;
-      hideContextMenu();
-      if (type === 'device') {
-        await openPortConnectionModal(id);
-      }
-    });
-    menu.appendChild(connectPortsBtn);  // Ahora menu está definido
   }
-  
 
-  async function openDeviceModal(device = null) {
+  function openDeviceModal(device = null) {
     const modal = document.getElementById('device-modal');
     const form = document.getElementById('device-form');
     const title = document.getElementById('device-title');
@@ -300,54 +287,6 @@
       if (form) form.reset();
       const idEl = document.getElementById('device-id'); if (idEl) idEl.value = '';
     }
-
-    const portsContainer = document.getElementById('ports-container');
-const portsList = document.getElementById('ports-list');
-const addPortBtn = document.getElementById('add-port');
-if (device) {
-  // Cargar puertos existentes
-  try {
-    const ports = await API.getPorts(device.id);
-    ports.forEach(p => addPortToList(p));
-  } catch (err) {
-    console.warn('Error cargando puertos:', err);
-  }
-} else {
-  portsList.innerHTML = '';
-}
-
-addPortBtn?.addEventListener('click', () => {
-  const portDiv = document.createElement('div');
-  portDiv.className = 'port-item';
-  portDiv.innerHTML = `
-    <input type="text" placeholder="Nombre (ej. Fa0/1)" required>
-    <select required>
-      <option value="Fast Ethernet">Fast Ethernet</option>
-      <option value="Gigabit Ethernet">Gigabit Ethernet</option>
-      <option value="Serial">Serial</option>
-    </select>
-    <button type="button" class="remove-port">×</button>
-  `;
-  portsList.appendChild(portDiv);
-  portDiv.querySelector('.remove-port').addEventListener('click', () => portsList.removeChild(portDiv));
-});
-
-// Función helper: addPortToList(port)
-function addPortToList(port) {
-  const portDiv = document.createElement('div');
-  portDiv.className = 'port-item';
-  portDiv.innerHTML = `
-    <input type="text" value="${port.name}" required>
-    <select required>
-      <option value="Fast Ethernet" ${port.type === 'Fast Ethernet' ? 'selected' : ''}>Fast Ethernet</option>
-      <option value="Gigabit Ethernet" ${port.type === 'Gigabit Ethernet' ? 'selected' : ''}>Gigabit Ethernet</option>
-      <option value="Serial" ${port.type === 'Serial' ? 'selected' : ''}>Serial</option>
-    </select>
-    <button type="button" class="remove-port">×</button>
-  `;
-  portsList.appendChild(portDiv);
-  portDiv.querySelector('.remove-port').addEventListener('click', () => portsList.removeChild(portDiv));
-}
     if (modal) { modal.hidden = false; modal.setAttribute('aria-hidden', 'false'); }
   }
   
@@ -472,13 +411,6 @@ function addPortToList(port) {
       image_id: imageId
 
     };
-    const ports = [];
-    document.querySelectorAll('#ports-list .port-item').forEach(item => {
-      const name = item.querySelector('input').value;
-      const type = item.querySelector('select').value;
-      if (name && type) ports.push({ name, type });
-    });
-    data.ports = ports;  // Agrega al payload
     try {
       if (id) await API.updateDevice(id, data);
       else await API.createDevice(data);
@@ -514,129 +446,6 @@ function addPortToList(port) {
     } catch (err) {
       alert('Error: ' + err.message);
     }
-  }
-
-  async function openPortConnectionModal(deviceId) {
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.innerHTML = `
-      <div class="modal-backdrop" data-close="modal"></div>
-      <div class="modal-dialog">
-        <button class="modal-close" aria-label="Cerrar">×</button>
-        <h2>Conectar Puertos</h2>
-        <form id="port-connection-form" autocomplete="off">
-          <label for="source-port">Puerto Origen</label>
-          <select id="source-port" required>
-            <option value="">Seleccionar puerto...</option>
-          </select>
-          <label for="target-device">Dispositivo Destino</label>
-          <select id="target-device" required>
-            <option value="">Seleccionar dispositivo...</option>
-          </select>
-          <label for="target-port">Puerto Destino</label>
-          <select id="target-port" required disabled>
-            <option value="">Seleccionar puerto...</option>
-          </select>
-          <div class="form-actions">
-            <button type="submit" class="btn btn--primary">Conectar</button>
-            <button type="button" class="btn" id="port-cancel">Cancelar</button>
-          </div>
-        </form>
-      </div>
-    `;
-    document.body.appendChild(modal);
-    modal.hidden = false;
-    modal.setAttribute('aria-hidden', 'false');
-  
-    const networkId = new URLSearchParams(location.search).get('network_id') || '1';
-    const sourcePortSelect = modal.querySelector('#source-port');
-    const targetDeviceSelect = modal.querySelector('#target-device');
-    const targetPortSelect = modal.querySelector('#target-port');
-    const form = modal.querySelector('#port-connection-form');
-    const cancelBtn = modal.querySelector('#port-cancel');
-    const closeBtn = modal.querySelector('.modal-close');
-  
-    // Cargar puertos disponibles del dispositivo origen
-    try {
-      const ports = await API.getAvailablePorts(deviceId);
-      ports.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = `${p.name} (${p.type})`;
-        sourcePortSelect.appendChild(opt);
-      });
-    } catch (err) {
-      alert('Error cargando puertos: ' + err.message);
-      document.body.removeChild(modal);
-      return;
-    }
-  
-    // Cargar dispositivos disponibles (excluyendo el origen)
-    try {
-      const devices = await API.getDevices(networkId);
-      devices.filter(d => d.id != deviceId).forEach(d => {
-        const opt = document.createElement('option');
-        opt.value = d.id;
-        opt.textContent = `${d.name} (ID: ${d.id})`;
-        targetDeviceSelect.appendChild(opt);
-      });
-    } catch (err) {
-      alert('Error cargando dispositivos: ' + err.message);
-      document.body.removeChild(modal);
-      return;
-    }
-  
-    // Al seleccionar dispositivo destino, cargar sus puertos disponibles
-    targetDeviceSelect.addEventListener('change', async () => {
-      const targetId = targetDeviceSelect.value;
-      targetPortSelect.innerHTML = '<option value="">Seleccionar puerto...</option>';
-      if (targetId) {
-        try {
-          const ports = await API.getAvailablePorts(targetId);
-          ports.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p.id;
-            opt.textContent = `${p.name} (${p.type})`;
-            targetPortSelect.appendChild(opt);
-          });
-          targetPortSelect.disabled = false;
-        } catch (err) {
-          alert('Error cargando puertos destino: ' + err.message);
-        }
-      } else {
-        targetPortSelect.disabled = true;
-      }
-    });
-  
-    // Manejar submit
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const sourcePortId = sourcePortSelect.value;
-      const targetPortId = targetPortSelect.value;
-      if (!sourcePortId || !targetPortId) {
-        alert('Selecciona ambos puertos.');
-        return;
-      }
-      try {
-        await API.createConnection({
-          network_id: parseInt(networkId),
-          from_device_id: parseInt(deviceId),
-          to_device_id: parseInt(targetDeviceSelect.value),
-          from_port_id: parseInt(sourcePortId),
-          to_port_id: parseInt(targetPortId),
-          link_type: 'ethernet',
-          status: 'up'
-        });
-        GRAPH_CACHE.clear();
-        await loadGraphFor(getCurrentView());
-        document.body.removeChild(modal);
-      } catch (err) {
-        alert('Error conectando: ' + err.message);
-      }
-    });
-  
-    // Cerrar modal
-    [closeBtn, cancelBtn].forEach(btn => btn?.addEventListener('click', () => document.body.removeChild(modal)));
   }
   
   function getCurrentView() {
