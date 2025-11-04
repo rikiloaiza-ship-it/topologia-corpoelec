@@ -71,7 +71,17 @@
     if (!res.ok) throw new Error('Error creando conexión');
     return res.json();
   }
-  
+  async function getPorts(deviceId) {
+    const data = await fetchJson('/devices/' + encodeURIComponent(deviceId) + '/ports');
+    return data.data || [];
+  }
+  async function upsertPorts(deviceId, ports) {
+    const data = await fetchJson('/devices/' + encodeURIComponent(deviceId) + '/ports', {
+      method: 'PATCH',
+      body: JSON.stringify({ ports })
+    });
+    return data.data || [];
+  }
   async function updateConnection(id, data) {
     const res = await Auth.apiFetch(`/connections/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
     if (!res.ok) throw new Error('Error actualizando conexión');
@@ -86,5 +96,9 @@
     if (!res.ok) throw new Error('Error eliminando conexión');
     return res.json();
   }
-  global.API = { getDevices, getConnections, getGraph, createDevice, updateDevice, deleteDevice, createConnection, updateConnection, deleteConnection, getDevice, getConnection, };
+  global.API = { getDevices, getConnections, getGraph, 
+    createDevice, updateDevice, deleteDevice, 
+    createConnection, updateConnection, deleteConnection, 
+    getDevice, getConnection, getPorts, 
+    upsertPorts };
 })(window);

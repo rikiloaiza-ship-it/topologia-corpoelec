@@ -139,7 +139,8 @@
           mac: n.mac || '',
           network_id: n.network_id,
           ghost: n.ghost === true ? 'true' : 'false' ,
-          image_id: n.image_id || null
+          image_id: n.image_id || null,
+          ports_summary: n.ports_summary || { total: 0, used: 0 }
         },
         position: p && hasNum(p.x) && hasNum(p.y) ? { x: Number(p.x), y: Number(p.y) } : undefined
       };
@@ -335,7 +336,26 @@
       cy.on('tap', 'node', ev => {
         const d = ev.target.data();
         console.log('Nodo clickeado:', d);
+        
+        if (window.connectMode) {
+          const summary = d.ports_summary || { total: 0, used: 0 };
+          const free = summary.total - summary.used;
+          if (free > 0) {
+            if (!window.selectedPortA) {
+              // Paso 1: Seleccionar puerto origen (A)
+              window.openPortSelectionModal(d.id, 'A');
+            } else {
+              // Paso 2: Seleccionar puerto destino (B)
+              window.openPortSelectionModal(d.id, 'B');
+            }
+          } else {
+            alert('Este dispositivo no tiene puertos libres.');
+          }
+          return;
+        }
+        // Lógica normal si no es modo conectar
       });
+      
 
       cy.on('cxttap', 'node', ev => {
         ev.originalEvent.preventDefault();
@@ -379,13 +399,79 @@
             console.error('Error guardando posición:', err);
           });
       });
-  
+
+      wireTooltips(cy);
       instances.set(containerId, cy);
     }
     return cy;
   }
 
   function debounce(fn, wait){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(null,a), wait); }; }
+
+  function wireTooltips(cy) {
+    cy.on('mouseover', 'node', (ev) => {
+      const node = ev.target;
+      const d = node.data();
+      console.log('Hover en nodo:', d);
+      const summary = d.ports_summary || { total: 0, used: 0 };
+      const free = summary.total - summary.used;
+      let tooltip = `${d.label}: ${summary.total} puertos total, ${summary.used} usados, ${free} libres`;
+      
+      // Si está en modo conectar, muestra puertos libres
+      if (window.connectMode && free > 0) {
+        tooltip += '\n\nPuertos libres: Haz click para seleccionar.';
+      }
+      
+      showTooltip(tooltip, ev.originalEvent.clientX, ev.originalEvent.clientY);
+    });
+    cy.on('mouseout', 'node', () => hideTooltip());
+  }
+
+  function portsSummary(node) {
+    const d = node.data() || {};
+    // Asumimos que el grafo incluye 'ports' (array de puertos) o 'ports_summary' (objeto con total/used)
+    // Si no, backend debe añadirlo al cargar el grafo (lo haremos en el modelo de grafo).
+    const ports = d.ports || [];
+    let summary = d.ports_summary || { total: ports.length, used: ports.filter(p => p.oper_status === 'up' || p.connected).length };
+    const free = (summary.total || 0) - (summary.used || 0);
+    let lines = [`${d.label || d.name || node.id()}`, `Puertos: ${summary.total} total • ${summary.used || 0} usados • ${free} libres`];
+    if (ports && ports.length) {
+      const topPorts = ports.slice(0, 10).map(p => {
+        const used = (p.oper_status === 'up' && p.admin_status !== 'down') || p.connected ? 'usado' : 'libre';
+        const kind = p.kind?.replace(/-/g, ' ') || '';
+        return `• ${p.name} (${kind}) — ${used}`;
+      });
+      lines = lines.concat(topPorts);
+      if (ports.length > 10) lines.push(`… +${ports.length - 10} más`);
+    }
+    return lines.join('\n');
+  }
+  
+  function showTooltip(text, x, y) {
+    let tip = document.getElementById('tooltip');
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.id = 'tooltip';
+      tip.style.position = 'fixed';
+      tip.style.zIndex = '9999';
+      tip.style.padding = '8px 12px';
+      tip.style.background = 'rgba(0,0,0,0.8)';
+      tip.style.color = '#fff';
+      tip.style.borderRadius = '4px';
+      tip.style.fontSize = '12px';
+      tip.style.pointerEvents = 'none';
+      document.body.appendChild(tip);
+    }
+    tip.textContent = text;
+    tip.style.left = (x + 10) + 'px';
+    tip.style.top = (y + 10) + 'px';
+    tip.style.display = 'block';
+  }
+  
+  function hideTooltip() {
+    const tip = document.getElementById('tooltip');
+    if (tip) tip.remove();
+  }
 
   function renderGraph(graph, opts = {}) {
     const containerId = opts.containerId || 'canvas';

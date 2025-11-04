@@ -53,6 +53,12 @@ async function create(req, res) {
     };
 
     const result = await Devices.createDevice(payload);
+    if (body.ports && Array.isArray(body.ports)) {
+      const Ports = require('../models/ports');
+      for (const p of body.ports) {
+        await Ports.createPort({ device_id: result.id, ...p });
+      }
+    }
     return res.status(201).json({ id: result.id });
   } catch (err) {
     console.error('devices.create error', err);
@@ -95,6 +101,16 @@ async function update(req, res) {
     if (!device) return res.status(404).json({ error: 'No encontrado' });
 
     await Devices.updateDevice(id, fields);
+    if (body.ports && Array.isArray(body.ports)) {
+      const Ports = require('../models/ports');
+      // Eliminar puertos existentes
+      await query('DELETE FROM ports WHERE device_id=?', [id]);
+      // Insertar los nuevos puertos
+      for (const p of body.ports) {
+        await Ports.createPort({ device_id: id, ...p });
+      }
+    }
+  
     return res.json({ ok: true });
   } catch (err) {
     console.error('devices.update error', err);

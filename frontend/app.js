@@ -1,6 +1,10 @@
 (function () {
   const THEME_KEY = 'theme';
   const root = document.documentElement;
+  window.connectMode = false;
+  window.selectedPortA = null;
+  let tooltipEl = null; // Para el tooltip de puertos
+
   function applyTheme(theme, persist) {
     root.dataset.theme = theme;
     root.style.colorScheme = theme;
@@ -145,6 +149,16 @@
   function bindCRUDButtons() {
     const addDeviceBtn = document.getElementById('add-device');
     const addConnectionBtn = document.getElementById('add-connection');
+    const connectBtn = document.getElementById('connect-ports-btn'); // Nuevo botón para modo conectar
+    if (connectBtn) {
+      connectBtn.addEventListener('click', () => {
+        window.connectMode = true;
+        window.selectedPortA = null;
+        setStatus('Modo conectar: selecciona dispositivo origen (puerto libre)', false);
+        // Desactiva otros eventos si es necesario (ej. modal de conexión)
+      });
+    }
+  
     if (addDeviceBtn) addDeviceBtn.addEventListener('click', () => openDeviceModal());
     if (addConnectionBtn) addConnectionBtn.addEventListener('click', () => openConnectionModal());
   }
@@ -244,7 +258,7 @@
     }
   }
 
-  function openDeviceModal(device = null) {
+  async function openDeviceModal(device = null) {
     const modal = document.getElementById('device-modal');
     const form = document.getElementById('device-form');
     const title = document.getElementById('device-title');
@@ -273,6 +287,7 @@
       imageInput.value = '';
       previewDiv.style.display = 'none';
     });
+
     if (device) {
       console.log('Device data:', device);
       if (title) title.textContent = 'Editar Dispositivo';
@@ -282,13 +297,29 @@
       document.getElementById('device-ip').value = device.ip_address || ''; 
       document.getElementById('device-mac').value = device.mac_address || ''; 
       document.getElementById('device-location').value = device.location || '';
-    } else {
-      if (title) title.textContent = 'Agregar Dispositivo';
-      if (form) form.reset();
-      const idEl = document.getElementById('device-id'); if (idEl) idEl.value = '';
+    // Nuevo: Cargar puertos existentes
+    try {
+      const ports = await API.getPorts(device.id); // Asume que API.getPorts existe en data.js
+      if (ports && ports.length > 0) {
+        const portsCountEl = document.getElementById('device-ports-count');
+        const portsTypeEl = document.getElementById('device-ports-type');
+        if (portsCountEl) portsCountEl.value = ports.length;
+        if (portsTypeEl) portsTypeEl.value = ports[0].kind || 'gigabit-ethernet'; // Asume tipo uniforme
+        // Nota: Para edición avanzada, podrías mostrar lista de puertos, pero por ahora solo count/type
+      } else {
+        document.getElementById('device-ports-count').value = '';
+        document.getElementById('device-ports-type').value = 'gigabit-ethernet';
+      }
+    } catch (err) {
+      console.error('Error cargando puertos:', err);
     }
-    if (modal) { modal.hidden = false; modal.setAttribute('aria-hidden', 'false'); }
+  } else {
+    if (title) title.textContent = 'Agregar Dispositivo';
+    if (form) form.reset();
+    const idEl = document.getElementById('device-id'); if (idEl) idEl.value = '';
   }
+  if (modal) { modal.hidden = false; modal.setAttribute('aria-hidden', 'false'); }
+}
   
   async function openConnectionModal(connection = null) {
     const modal = document.getElementById('connection-modal');
@@ -374,15 +405,34 @@
     e.preventDefault();
     const id = document.getElementById('device-id')?.value;
     const imageInput = document.getElementById('device-image');
+    const portsCount = parseInt(document.getElementById('device-ports-count')?.value) || 0;
+    const portsType = document.getElementById('device-ports-type')?.value;
     let imageId = null;
     const networkIdStr = new URLSearchParams(location.search).get('network_id') || '1';
     const networkId = parseInt(networkIdStr);
-    
+  
     if (isNaN(networkId)) {
       alert('ID de red inválido. Verifica la URL.');
       return;
     }
-
+  
+    // Inicializa data como objeto vacío
+    let data = {};
+  
+    // Agrega puertos si hay
+    if (portsCount > 0) {
+      data.ports = [];
+      for (let i = 1; i <= portsCount; i++) {
+        data.ports.push({
+          name: `${portsType === 'wifi' ? 'WLAN' : (portsType === 'fast-ethernet' ? 'Fa' : 'Gi')}0/${i}`,
+          kind: portsType,
+          speed_mbps: portsType === 'fast-ethernet' ? 100 : 1000,
+          position: i
+        });
+      }
+    }
+  
+    // Maneja la imagen
     if (imageInput.files[0]) {
       const formData = new FormData();
       formData.append('image', imageInput.files[0]);
@@ -400,17 +450,16 @@
         return;
       }
     }
-    
-    const data = {
-      network_id: networkId,  
-      name: document.getElementById('device-name')?.value,
-      device_type: document.getElementById('device-type')?.value,
-      ip_address: document.getElementById('device-ip')?.value || null,
-      mac_address: document.getElementById('device-mac')?.value || null,
-      location: document.getElementById('device-location')?.value || null,
-      image_id: imageId
-
-    };
+  
+    // Completa data con el resto de campos
+    data.network_id = networkId;
+    data.name = document.getElementById('device-name')?.value;
+    data.device_type = document.getElementById('device-type')?.value;
+    data.ip_address = document.getElementById('device-ip')?.value || null;
+    data.mac_address = document.getElementById('device-mac')?.value || null;
+    data.location = document.getElementById('device-location')?.value || null;
+    data.image_id = imageId;
+  
     try {
       if (id) await API.updateDevice(id, data);
       else await API.createDevice(data);
@@ -734,4 +783,65 @@ document.addEventListener('node:contextmenu', function(evt) {
     showContextMenu(position.x, position.y, 'connection', edgeData.id);
   });
   
+// Nueva función para selección de puertos en modo conectar
+async function openPortSelectionModal(deviceId, portType) {
+  const ports = await API.getPorts(deviceId);
+  const freePorts = ports.filter(p => p.oper_status !== 'up' || p.admin_status === 'down'); 
+  
+  if (freePorts.length === 0) {
+    alert('No hay puertos libres en este dispositivo.');
+    return;
+  }
+  
+
+  const modal = document.createElement('div');
+  modal.id = 'port-modal';
+  modal.innerHTML = `
+    <div style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:20px; border:1px solid #ccc; z-index:10000;">
+      <h3>Seleccionar Puerto ${portType} para Dispositivo ${deviceId}</h3>
+      <select id="port-select">
+        ${freePorts.map(p => `<option value="${p.id}">${p.name} (${p.kind})</option>`).join('')}
+      </select>
+      <button id="port-ok">OK</button>
+      <button id="port-cancel">Cancelar</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  
+  document.getElementById('port-ok').addEventListener('click', async () => {
+    const selectedPortId = document.getElementById('port-select').value;
+    if (portType === 'A') {
+      window.selectedPortA = { deviceId, portId: selectedPortId };
+      setStatus('Puerto origen seleccionado. Selecciona dispositivo destino.', false);
+    } else {
+      const data = {
+        network_id: new URLSearchParams(location.search).get('network_id') || '1',
+        from_device_id: window.selectedPortA.deviceId,
+        to_device_id: deviceId,
+        a_port_id: window.selectedPortA.portId,
+        b_port_id: selectedPortId,
+        link_type: 'ethernet',
+        status: 'up'
+      };
+      try {
+        await API.createConnection(data);
+        GRAPH_CACHE.clear();
+        await loadGraphFor(getCurrentView());
+        window.connectMode = false;
+        window.selectedPortA = null;
+        setStatus('Conexión creada.', false);
+      } catch (err) {
+        alert('Error creando conexión: ' + err.message);
+      }
+    }
+    document.body.removeChild(modal);
+  });
+  
+  document.getElementById('port-cancel').addEventListener('click', () => {
+    document.body.removeChild(modal);
+  });
+}
+
+window.openPortSelectionModal = openPortSelectionModal;
+
 })();

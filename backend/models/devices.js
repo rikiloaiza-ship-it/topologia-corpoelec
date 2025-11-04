@@ -33,4 +33,9 @@ async function deleteDevice(id) {
   await getPool().execute('DELETE FROM devices WHERE id=?', [id]);
 }
 
-module.exports = { listDevicesByNetwork, getDeviceById, createDevice, updateDevice, deleteDevice };
+async function getPortsByDeviceId(deviceId) {
+  const Ports = require('./ports');
+  return await Ports.listPortsByDevice(deviceId);
+}
+
+module.exports = { listDevicesByNetwork, getDeviceById, createDevice, updateDevice, deleteDevice, getPortsByDeviceId  };

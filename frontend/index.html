@@ -60,11 +60,17 @@
       <div class="tool-group">
         <button class="btn" type="button" id="add-device" title="Agregar dispositivo">+ Dispositivo</button>
         <button class="btn" type="button" id="add-connection" title="Agregar conexión">+ Conexión</button>
+        
       </div>
+      <div class="tool-group">
+        <button class="btn" type="button" id="connect-ports-btn" title="Conectar puertos">Conectar Puertos</button>
+      </div>
+      
       <div class="tool-group">
         <input class="search" type="search" id="device-search" placeholder="Buscar dispositivo..." aria-label="Buscar dispositivo" />
       </div>
     </div>
+
   </nav>
     <div class="session">
       <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false" aria-label="Cambiar tema">
@@ -129,6 +135,14 @@
       <input name="mac_address" id="device-mac" type="text" />
       <label for="device-location">Ubicación</label>
       <input name="location" id="device-location" type="text" />
+      <label for="device-ports-count">Número de Puertos</label>
+      <input type="number" id="device-ports-count" min="0" max="48" />
+      <label for="device-ports-type">Tipo de Puertos</label>
+      <select id="device-ports-type">
+        <option value="fast-ethernet">Fast Ethernet</option>
+        <option value="gigabit-ethernet">Gigabit Ethernet</option>
+        <option value="wifi">WiFi</option>
+      </select>
       <div class="form-actions">
         <button type="submit" class="btn btn--primary" id="device-submit">Guardar</button>
         <button type="button" class="btn" id="device-cancel">Cancelar</button>

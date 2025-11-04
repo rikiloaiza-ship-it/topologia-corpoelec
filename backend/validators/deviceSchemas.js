@@ -9,7 +9,16 @@ const createDevice = Joi.object({
   mac_address: Joi.string().max(50).allow(null, '').optional(),
   location: Joi.string().max(255).allow(null, '').optional(),
   image_id: Joi.number().integer().positive().allow(null).optional(),
-  metadata: Joi.any().optional()
+  metadata: Joi.any().optional(),
+  ports: Joi.array().items(Joi.object({
+    name: Joi.string().required(),
+    kind: Joi.string().valid('fast-ethernet', 'gigabit-ethernet', 'wifi', 'sfp', 'sfp+', 'other').default('other'),
+    speed_mbps: Joi.number().integer().optional(),
+    admin_status: Joi.string().valid('up', 'down').default('up'),
+    oper_status: Joi.string().valid('up', 'down').default('down'),
+    position: Joi.number().integer().optional(),
+    notes: Joi.string().optional()
+  })).optional()
 });
 
 const updateDevice = Joi.object({
