@@ -103,7 +103,6 @@ async function update(req, res) {
         return res.status(400).json({ error: 'Los dispositivos no pertenecen a la misma red de la conexión' });
       }
 
-      // AGREGAR VALIDACIONES PARA PUERTOS EN UPDATE (similar a create)
       if (fields.a_port_id !== undefined && fields.a_port_id) {
         const aPort = await query('SELECT device_id FROM ports WHERE id=?', [fields.a_port_id]);
         if (!aPort[0] || aPort[0].device_id != fromId) return res.status(400).json({ error: 'Puerto A no pertenece al dispositivo origen actualizado' });

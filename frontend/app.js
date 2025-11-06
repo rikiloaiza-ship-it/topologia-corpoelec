@@ -637,7 +637,18 @@ async function fetchFullGraph(networkId) {
   return full;
 }
 
-/* ====== projectGraphForView (restaura la función faltante) ====== */
+async function computeNodePortsSummary(deviceId) {
+  try {
+    const ports = await API.getPorts(deviceId);
+    const total = ports.length;
+    // FIX: Solo contar conectados como usados
+    const used = ports.filter(p => p.connected === true).length;
+    return { ports, ports_summary: { total, used } };
+  } catch (e) {
+    return { ports: [], ports_summary: { total: 0, used: 0 } };
+  }
+}
+
 function isWifiType(t) {
   t = String(t || '').toLowerCase().trim();
   return ['ap','wifi','router','gateway','controller','repeater','access_point','ap_wifi','wireless_ap','wifi_ap','ap-bridge'].includes(t);
@@ -694,7 +705,7 @@ function projectGraphForView(full, view) {
     counts: { nodes: viewNodes.length, edges: viewEdges.length }
   };
 }
-/* ============================================================= */
+
 
 async function loadGraphFor(view) {
   try {
@@ -704,9 +715,7 @@ async function loadGraphFor(view) {
     if (typeof setStatus === 'function') setStatus(`Cargando red ${networkId} (${label})…`);
 
     const full = await fetchFullGraph(networkId);
-
-    const projected = projectGraphForView(full, view);
-
+    let projected = projectGraphForView(full, view);
     const containerId = view === 'switches' ? 'canvas-switches' : 'canvas-wifi';
     const otherId = containerId === 'canvas-wifi' ? 'canvas-switches' : 'canvas-wifi';
     if (document.getElementById(otherId)) {
@@ -786,14 +795,13 @@ document.addEventListener('node:contextmenu', function(evt) {
 // Nueva función para selección de puertos en modo conectar
 async function openPortSelectionModal(deviceId, portType) {
   const ports = await API.getPorts(deviceId);
-  const freePorts = ports.filter(p => p.oper_status !== 'up' || p.admin_status === 'down'); 
-  
+  // FIX: criterio de puerto libre robusto: no conectado Y no "up" en admin activo
+  const freePorts = ports.filter(p => !p.connected); // FIX: Solo excluir conectados (no importa oper_status)
+
   if (freePorts.length === 0) {
     alert('No hay puertos libres en este dispositivo.');
     return;
   }
-  
-
   const modal = document.createElement('div');
   modal.id = 'port-modal';
   modal.innerHTML = `
@@ -807,19 +815,31 @@ async function openPortSelectionModal(deviceId, portType) {
     </div>
   `;
   document.body.appendChild(modal);
-  
   document.getElementById('port-ok').addEventListener('click', async () => {
-    const selectedPortId = document.getElementById('port-select').value;
+    const selectedPortIdStr = document.getElementById('port-select').value;
+    const selectedPort = freePorts.find(p => String(p.id) === String(selectedPortIdStr));
     if (portType === 'A') {
-      window.selectedPortA = { deviceId, portId: selectedPortId };
+      // FIX: guarda nombre y fuerza tipos numéricos
+      window.selectedPortA = { 
+        deviceId: parseInt(deviceId, 10), 
+        portId: parseInt(selectedPortIdStr, 10),
+        portName: selectedPort?.name || null
+      };
       setStatus('Puerto origen seleccionado. Selecciona dispositivo destino.', false);
     } else {
+      const networkId = parseInt(new URLSearchParams(location.search).get('network_id') || '1', 10);
+      const bPortId = parseInt(selectedPortIdStr, 10);
+      const bPortName = selectedPort?.name || null;
       const data = {
-        network_id: new URLSearchParams(location.search).get('network_id') || '1',
-        from_device_id: window.selectedPortA.deviceId,
-        to_device_id: deviceId,
-        a_port_id: window.selectedPortA.portId,
-        b_port_id: selectedPortId,
+        // FIX: castear a enteros evita que el backend ignore campos y los deje como NULL
+        network_id: networkId,
+        from_device_id: parseInt(window.selectedPortA.deviceId, 10),
+        to_device_id: parseInt(deviceId, 10),
+        a_port_id: parseInt(window.selectedPortA.portId, 10),
+        b_port_id: bPortId,
+        // Opcional si tu API los acepta; si no, será ignorado sin problema.
+        a_port_name: window.selectedPortA.portName || null,
+        b_port_name: bPortName,
         link_type: 'ethernet',
         status: 'up'
       };
@@ -836,7 +856,6 @@ async function openPortSelectionModal(deviceId, portType) {
     }
     document.body.removeChild(modal);
   });
-  
   document.getElementById('port-cancel').addEventListener('click', () => {
     document.body.removeChild(modal);
   });

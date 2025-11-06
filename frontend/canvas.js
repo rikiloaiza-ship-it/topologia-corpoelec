@@ -128,6 +128,13 @@
         }
       }
       const p = meta.pos || meta.position || (hasNum(n.x) && hasNum(n.y) ? { x: n.x, y: n.y } : null);
+      // FIX: propagar ports y derivar ports_summary de ser necesario
+      const portsArr = Array.isArray(n.ports) ? n.ports : [];
+      const derivedSummary = {
+        total: portsArr.length,
+        used: portsArr.filter(p => p.connected === true).length
+      };    
+      const finalSummary = n.ports_summary || (portsArr.length ? derivedSummary : { total: 0, used: 0 });
       return {
         group: 'nodes',
         data: {
@@ -138,9 +145,11 @@
           ip: n.ip || '',
           mac: n.mac || '',
           network_id: n.network_id,
-          ghost: n.ghost === true ? 'true' : 'false' ,
+          ghost: n.ghost === true ? 'true' : 'false',
           image_id: n.image_id || null,
-          ports_summary: n.ports_summary || { total: 0, used: 0 }
+          // FIX: agregar ports y ports_summary al data del nodo
+          ports: portsArr.length ? portsArr : undefined,
+          ports_summary: finalSummary
         },
         position: p && hasNum(p.x) && hasNum(p.y) ? { x: Number(p.x), y: Number(p.y) } : undefined
       };
@@ -411,17 +420,8 @@
   function wireTooltips(cy) {
     cy.on('mouseover', 'node', (ev) => {
       const node = ev.target;
-      const d = node.data();
-      console.log('Hover en nodo:', d);
-      const summary = d.ports_summary || { total: 0, used: 0 };
-      const free = summary.total - summary.used;
-      let tooltip = `${d.label}: ${summary.total} puertos total, ${summary.used} usados, ${free} libres`;
-      
-      // Si está en modo conectar, muestra puertos libres
-      if (window.connectMode && free > 0) {
-        tooltip += '\n\nPuertos libres: Haz click para seleccionar.';
-      }
-      
+      // FIX: usar la función detallada
+      const tooltip = portsSummary(node);
       showTooltip(tooltip, ev.originalEvent.clientX, ev.originalEvent.clientY);
     });
     cy.on('mouseout', 'node', () => hideTooltip());
@@ -429,15 +429,14 @@
 
   function portsSummary(node) {
     const d = node.data() || {};
-    // Asumimos que el grafo incluye 'ports' (array de puertos) o 'ports_summary' (objeto con total/used)
-    // Si no, backend debe añadirlo al cargar el grafo (lo haremos en el modelo de grafo).
     const ports = d.ports || [];
-    let summary = d.ports_summary || { total: ports.length, used: ports.filter(p => p.oper_status === 'up' || p.connected).length };
+    let summary = d.ports_summary || { total: ports.length, used: ports.filter(p => p.connected === true).length };
     const free = (summary.total || 0) - (summary.used || 0);
     let lines = [`${d.label || d.name || node.id()}`, `Puertos: ${summary.total} total • ${summary.used || 0} usados • ${free} libres`];
     if (ports && ports.length) {
       const topPorts = ports.slice(0, 10).map(p => {
-        const used = (p.oper_status === 'up' && p.admin_status !== 'down') || p.connected ? 'usado' : 'libre';
+        // FIX: Solo usar connected para determinar usado
+        const used = (p.connected === true) ? 'usado' : 'libre';
         const kind = p.kind?.replace(/-/g, ' ') || '';
         return `• ${p.name} (${kind}) — ${used}`;
       });
@@ -446,6 +445,8 @@
     }
     return lines.join('\n');
   }
+  
+  
   
   function showTooltip(text, x, y) {
     let tip = document.getElementById('tooltip');
@@ -460,6 +461,8 @@
       tip.style.borderRadius = '4px';
       tip.style.fontSize = '12px';
       tip.style.pointerEvents = 'none';
+      // FIX: respetar saltos de línea
+      tip.style.whiteSpace = 'pre-line';
       document.body.appendChild(tip);
     }
     tip.textContent = text;

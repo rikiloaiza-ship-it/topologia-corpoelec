@@ -37,11 +37,21 @@ async function getGraphByNetwork(req, res) {
       Connections.listConnectionsByNetwork(networkId)
     ]);
 
-    // Nuevo: Para cada dispositivo, obtener puertos y calcular summary
     const nodesPromises = devices.map(async (d) => {
+      // Filtrar conexiones activas ('up') para este dispositivo
+      const deviceConnections = connections.filter(c => c.status === 'up' && (c.from_device_id === d.id || c.to_device_id === d.id));
+      const deviceConnectedPorts = new Set();
+      deviceConnections.forEach(c => {
+        // FIX: Añadir solo puertos que pertenecen al dispositivo actual
+        if (c.from_device_id === d.id && c.a_port_id) deviceConnectedPorts.add(c.a_port_id);
+        if (c.to_device_id === d.id && c.b_port_id) deviceConnectedPorts.add(c.b_port_id);
+      });
+    
       const ports = await Ports.listPortsByDevice(d.id);
-      const total = ports.length;
-      const used = ports.filter(p => p.oper_status === 'up' && p.admin_status !== 'down').length;
+      const enrichedPorts = ports.map(p => ({ ...p, connected: deviceConnectedPorts.has(p.id) }));
+      const total = enrichedPorts.length;
+      const used = deviceConnectedPorts.size; // Ahora será correcto: 1 para dispositivo 145
+    
       return {
         id: d.id,
         network_id: d.network_id,
@@ -52,7 +62,8 @@ async function getGraphByNetwork(req, res) {
         location: d.location,
         image_id: d.image_id,
         metadata: tryParseMeta(d.metadata),
-        ports_summary: { total, used } // Nuevo: summary de puertos
+        ports: enrichedPorts, // Incluir para tooltip detallado
+        ports_summary: { total, used }
       };
     });
     let nodes = await Promise.all(nodesPromises);
@@ -64,7 +75,7 @@ async function getGraphByNetwork(req, res) {
       target: c.to_device_id,
       type: c.link_type,
       status: c.status,
-      a_port_name: c.a_port_name, // Nuevo: nombres de puertos en conexiones
+      a_port_name: c.a_port_name,
       b_port_name: c.b_port_name
     }));
 
@@ -87,5 +98,6 @@ async function getGraphByNetwork(req, res) {
     return res.status(500).json({ error: 'Error interno' });
   }
 }
+
 
 module.exports = { getGraphByNetwork };
