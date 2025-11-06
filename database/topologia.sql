@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 04-11-2025 a las 14:24:39
+-- Tiempo de generación: 06-11-2025 a las 16:49:30
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.2.12
 
@@ -31,26 +31,24 @@ CREATE TABLE `connections` (
   `id` int(11) NOT NULL,
   `network_id` int(11) NOT NULL,
   `from_device_id` int(11) NOT NULL,
+  `a_port_id` int(11) DEFAULT NULL,
   `to_device_id` int(11) NOT NULL,
+  `b_port_id` int(11) DEFAULT NULL,
   `link_type` varchar(50) DEFAULT NULL,
   `status` varchar(50) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `from_id_norm` int(11) GENERATED ALWAYS AS (least(`from_device_id`,`to_device_id`)) STORED,
-  `to_id_norm` int(11) GENERATED ALWAYS AS (greatest(`from_device_id`,`to_device_id`)) STORED
+  `to_id_norm` int(11) GENERATED ALWAYS AS (greatest(`from_device_id`,`to_device_id`)) STORED,
+  `a_port_name` varchar(64) DEFAULT NULL,
+  `b_port_name` varchar(64) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Volcado de datos para la tabla `connections`
 --
 
-INSERT INTO `connections` (`id`, `network_id`, `from_device_id`, `to_device_id`, `link_type`, `status`, `created_at`) VALUES
-(203, 1, 101, 115, 'ethernet', 'up', '2025-10-29 13:02:39'),
-(212, 1, 115, 121, 'ethernet', 'up', '2025-10-30 14:34:30'),
-(215, 1, 120, 125, 'ethernet', 'up', '2025-10-30 19:00:02'),
-(216, 1, 131, 124, 'ethernet', 'up', '2025-10-31 17:20:16'),
-(221, 1, 139, 140, 'ethernet', 'up', '2025-11-03 15:11:16'),
-(222, 1, 120, 115, 'ethernet', 'up', '2025-11-03 19:31:36'),
-(223, 1, 115, 124, 'ethernet', 'up', '2025-11-03 19:31:52');
+INSERT INTO `connections` (`id`, `network_id`, `from_device_id`, `a_port_id`, `to_device_id`, `b_port_id`, `link_type`, `status`, `created_at`, `a_port_name`, `b_port_name`) VALUES
+(239, 1, 146, 46, 145, 31, 'ethernet', 'up', '2025-11-06 15:45:33', 'Gi0/1', 'Gi0/1');
 
 -- --------------------------------------------------------
 
@@ -77,19 +75,9 @@ CREATE TABLE `devices` (
 --
 
 INSERT INTO `devices` (`id`, `network_id`, `name`, `ip_address`, `mac_address`, `device_type`, `location`, `image_id`, `metadata`, `created_at`, `updated_at`) VALUES
-(101, 1, 'AP-Lobby', '10.0.0.10', 'AA:BB:CC:DD:EE:01', 'ap', 'Sala Rack 3 Piso 5', NULL, NULL, '2025-10-24 13:18:35', '2025-10-30 14:19:58'),
-(115, 1, 'Router', '120.1.1.1', 'DB-1C-FC-BB-FC-B7', 'ap', 'Sala 3, Rack ', NULL, NULL, '2025-10-28 18:18:06', '2025-10-30 15:17:58'),
-(120, 1, 'AP-LOBBY-2', '198.168.1.1', '3a:5d:9a:cd:e4:2f', 'ap', 'Sala 5', 4, NULL, '2025-10-30 14:20:41', '2025-10-30 18:59:34'),
-(121, 1, 'AP-LOBBY3', '198.168.1.1', '3a:5d:9a:cd:e4:2f', 'ap', 'rack', NULL, NULL, '2025-10-30 14:21:06', '2025-10-30 15:55:44'),
-(124, 1, 'RACK3', '198.167.1.1', '3a:5d:9a:cd:e4:2f', 'ap', NULL, NULL, NULL, '2025-10-30 14:22:20', '2025-10-31 15:42:51'),
 (125, 1, 'RACK', '198.167.1.1', '3a:5d:9a:cd:e4:2f', 'ap', NULL, 2, NULL, '2025-10-30 14:22:37', '2025-10-30 15:52:30'),
-(126, 1, 'RACK', '198.167.1.1', '3a:5d:9a:cd:e4:2f', 'ap', NULL, NULL, NULL, '2025-10-30 14:22:49', '2025-10-30 15:17:41'),
-(129, 1, 'Router', '198.168.1.1', '3a:5d:9a:cd:e4:2f', 'ap', 'Sala ', NULL, NULL, '2025-10-30 15:17:01', '2025-10-30 15:17:45'),
-(130, 1, 'ROUTER', '198.168.1.1', '82:58:2f:09:92:e8', 'ap', 'Sala 3', NULL, NULL, '2025-10-31 17:13:07', '2025-10-31 17:16:38'),
-(131, 1, 'NUEVOO', '198.168.1.1', '82:58:2f:09:92:e8', 'ap', 'sala 3', NULL, NULL, '2025-10-31 17:15:55', '2025-10-31 17:15:55'),
-(134, 1, 'Prueba 123', '198.168.1.1', '82:58:2f:09:92:e8', 'ap', 'sala 3', NULL, NULL, '2025-10-31 17:39:36', '2025-10-31 17:39:36'),
-(139, 1, 'DSADASD', '198.168.1.1', '75:2f:88:99:07:7d', 'switch', 'SALA 3', NULL, NULL, '2025-11-03 14:54:10', '2025-11-03 14:54:10'),
-(140, 1, '122121', '198.168.1.1', '75:2f:88:99:07:7d', 'switch', 'saasa', NULL, NULL, '2025-11-03 14:55:34', '2025-11-03 14:55:34');
+(145, 1, '313131', '198.111.1.1', 'f3:2f:9d:ae:ac:96', 'switch', 'SALA 3', NULL, NULL, '2025-11-06 14:16:27', '2025-11-06 15:45:49'),
+(146, 1, 'SWITCHE', '198.168.1.1', 'f3:2f:9d:ae:ac:96', 'switch', 'SALA 4', NULL, NULL, '2025-11-06 14:17:21', '2025-11-06 15:45:51');
 
 -- --------------------------------------------------------
 
@@ -337,7 +325,12 @@ INSERT INTO `login_attempts` (`id`, `user_id`, `username`, `ip`, `success`, `cre
 (181, 3, 'normal', '::1', 1, '2025-10-31 14:34:05'),
 (182, 1, 'admin', '::1', 1, '2025-10-31 14:34:13'),
 (183, 1, 'admin', '::1', 1, '2025-10-31 15:24:32'),
-(184, 1, 'admin', '::1', 1, '2025-11-03 15:02:29');
+(184, 1, 'admin', '::1', 1, '2025-11-03 15:02:29'),
+(185, 1, 'admin', '::1', 1, '2025-11-04 17:38:12'),
+(186, 1, 'admin', '::1', 1, '2025-11-06 14:37:03'),
+(187, 1, 'admin', '::1', 1, '2025-11-06 14:37:21'),
+(188, 1, 'admin', '::1', 1, '2025-11-06 14:56:23'),
+(189, 1, 'admin', '::1', 1, '2025-11-06 15:44:30');
 
 -- --------------------------------------------------------
 
@@ -381,6 +374,57 @@ CREATE TABLE `ping_logs` (
   `latency_ms` int(11) DEFAULT NULL,
   `ran_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `ports`
+--
+
+CREATE TABLE `ports` (
+  `id` int(11) NOT NULL,
+  `device_id` int(11) NOT NULL,
+  `name` varchar(64) NOT NULL,
+  `kind` enum('fast-ethernet','gigabit-ethernet','wifi','sfp','sfp+','other') DEFAULT 'other',
+  `speed_mbps` int(11) DEFAULT NULL,
+  `admin_status` enum('up','down') DEFAULT 'up',
+  `oper_status` enum('up','down') DEFAULT 'down',
+  `position` int(11) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `ports`
+--
+
+INSERT INTO `ports` (`id`, `device_id`, `name`, `kind`, `speed_mbps`, `admin_status`, `oper_status`, `position`, `notes`, `created_at`, `updated_at`) VALUES
+(31, 145, 'Gi0/1', 'gigabit-ethernet', 1000, 'up', 'down', 1, NULL, '2025-11-06 14:16:27', '2025-11-06 14:53:54'),
+(32, 145, 'Gi0/2', 'gigabit-ethernet', 1000, 'up', 'down', 2, NULL, '2025-11-06 14:16:27', '2025-11-06 14:16:27'),
+(33, 145, 'Gi0/3', 'gigabit-ethernet', 1000, 'up', 'down', 3, NULL, '2025-11-06 14:16:27', '2025-11-06 14:16:27'),
+(34, 145, 'Gi0/4', 'gigabit-ethernet', 1000, 'up', 'down', 4, NULL, '2025-11-06 14:16:27', '2025-11-06 14:16:27'),
+(35, 145, 'Gi0/5', 'gigabit-ethernet', 1000, 'up', 'down', 5, NULL, '2025-11-06 14:16:27', '2025-11-06 14:16:27'),
+(36, 145, 'Gi0/6', 'gigabit-ethernet', 1000, 'up', 'down', 6, NULL, '2025-11-06 14:16:27', '2025-11-06 14:16:27'),
+(37, 145, 'Gi0/7', 'gigabit-ethernet', 1000, 'up', 'down', 7, NULL, '2025-11-06 14:16:28', '2025-11-06 14:16:28'),
+(38, 145, 'Gi0/8', 'gigabit-ethernet', 1000, 'up', 'down', 8, NULL, '2025-11-06 14:16:28', '2025-11-06 14:16:28'),
+(39, 145, 'Gi0/9', 'gigabit-ethernet', 1000, 'up', 'down', 9, NULL, '2025-11-06 14:16:28', '2025-11-06 14:16:28'),
+(40, 145, 'Gi0/10', 'gigabit-ethernet', 1000, 'up', 'down', 10, NULL, '2025-11-06 14:16:28', '2025-11-06 14:16:28'),
+(41, 145, 'Gi0/11', 'gigabit-ethernet', 1000, 'up', 'down', 11, NULL, '2025-11-06 14:16:28', '2025-11-06 14:16:28'),
+(42, 145, 'Gi0/12', 'gigabit-ethernet', 1000, 'up', 'down', 12, NULL, '2025-11-06 14:16:28', '2025-11-06 14:16:28'),
+(43, 145, 'Gi0/13', 'gigabit-ethernet', 1000, 'up', 'down', 13, NULL, '2025-11-06 14:16:28', '2025-11-06 14:16:28'),
+(44, 145, 'Gi0/14', 'gigabit-ethernet', 1000, 'up', 'down', 14, NULL, '2025-11-06 14:16:28', '2025-11-06 14:16:28'),
+(45, 145, 'Gi0/15', 'gigabit-ethernet', 1000, 'up', 'down', 15, NULL, '2025-11-06 14:16:28', '2025-11-06 14:16:28'),
+(46, 146, 'Gi0/1', 'gigabit-ethernet', 1000, 'up', 'down', 1, NULL, '2025-11-06 14:17:22', '2025-11-06 14:17:22'),
+(47, 146, 'Gi0/2', 'gigabit-ethernet', 1000, 'up', 'down', 2, NULL, '2025-11-06 14:17:22', '2025-11-06 14:17:22'),
+(48, 146, 'Gi0/3', 'gigabit-ethernet', 1000, 'up', 'down', 3, NULL, '2025-11-06 14:17:22', '2025-11-06 14:17:22'),
+(49, 146, 'Gi0/4', 'gigabit-ethernet', 1000, 'up', 'down', 4, NULL, '2025-11-06 14:17:22', '2025-11-06 14:17:22'),
+(50, 146, 'Gi0/5', 'gigabit-ethernet', 1000, 'up', 'down', 5, NULL, '2025-11-06 14:17:22', '2025-11-06 14:17:22'),
+(51, 146, 'Gi0/6', 'gigabit-ethernet', 1000, 'up', 'down', 6, NULL, '2025-11-06 14:17:22', '2025-11-06 14:17:22'),
+(52, 146, 'Gi0/7', 'gigabit-ethernet', 1000, 'up', 'down', 7, NULL, '2025-11-06 14:17:22', '2025-11-06 14:17:22'),
+(53, 146, 'Gi0/8', 'gigabit-ethernet', 1000, 'up', 'down', 8, NULL, '2025-11-06 14:17:22', '2025-11-06 14:17:22'),
+(54, 146, 'Gi0/9', 'gigabit-ethernet', 1000, 'up', 'down', 9, NULL, '2025-11-06 14:17:22', '2025-11-06 14:17:22'),
+(55, 146, 'Gi0/10', 'gigabit-ethernet', 1000, 'up', 'down', 10, NULL, '2025-11-06 14:17:22', '2025-11-06 14:17:22');
 
 -- --------------------------------------------------------
 
@@ -443,7 +487,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `email`, `password_hash`, `role_id`, `status`, `last_login`, `created_at`, `updated_at`, `is_active`) VALUES
-(1, 'admin', 'admin@local', '$2b$10$xBCl/od4qYezgJ939oUcK.qfW/h2vr.dKZJBXfAuvRxi6rxWc/Rw.', 1, 'active', '2025-11-03 15:02:29', '2025-10-14 17:51:23', '2025-11-03 15:02:29', 1),
+(1, 'admin', 'admin@local', '$2b$10$xBCl/od4qYezgJ939oUcK.qfW/h2vr.dKZJBXfAuvRxi6rxWc/Rw.', 1, 'active', '2025-11-06 15:44:30', '2025-10-14 17:51:23', '2025-11-06 15:44:30', 1),
 (3, 'normal', 'normal@local', '$2b$10$vJNZ4QVQyem5iZ/Xs5DiyuuW.Qnz22ZpiaUDswy9FlWnswleZvm0O', 2, 'active', '2025-10-31 14:34:05', '2025-10-22 14:03:03', '2025-10-31 14:34:05', 1);
 
 -- --------------------------------------------------------
@@ -486,7 +530,9 @@ ALTER TABLE `connections`
   ADD UNIQUE KEY `uq_conn_pair` (`network_id`,`from_id_norm`,`to_id_norm`),
   ADD KEY `fk_conn_from` (`from_device_id`),
   ADD KEY `fk_conn_to` (`to_device_id`),
-  ADD KEY `idx_conn_network` (`network_id`);
+  ADD KEY `idx_conn_network` (`network_id`),
+  ADD KEY `fk_conn_a_port` (`a_port_id`),
+  ADD KEY `fk_conn_b_port` (`b_port_id`);
 
 --
 -- Indices de la tabla `devices`
@@ -533,6 +579,14 @@ ALTER TABLE `networks`
 ALTER TABLE `ping_logs`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_ping_device_time` (`device_id`,`ran_at`);
+
+--
+-- Indices de la tabla `ports`
+--
+ALTER TABLE `ports`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_device_port_name` (`device_id`,`name`),
+  ADD KEY `idx_port_device` (`device_id`);
 
 --
 -- Indices de la tabla `roles`
@@ -582,13 +636,13 @@ ALTER TABLE `view_backgrounds`
 -- AUTO_INCREMENT de la tabla `connections`
 --
 ALTER TABLE `connections`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=224;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=240;
 
 --
 -- AUTO_INCREMENT de la tabla `devices`
 --
 ALTER TABLE `devices`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=141;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=147;
 
 --
 -- AUTO_INCREMENT de la tabla `device_positions`
@@ -606,7 +660,7 @@ ALTER TABLE `images`
 -- AUTO_INCREMENT de la tabla `login_attempts`
 --
 ALTER TABLE `login_attempts`
-  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=185;
+  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=190;
 
 --
 -- AUTO_INCREMENT de la tabla `networks`
@@ -619,6 +673,12 @@ ALTER TABLE `networks`
 --
 ALTER TABLE `ping_logs`
   MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT de la tabla `ports`
+--
+ALTER TABLE `ports`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=56;
 
 --
 -- AUTO_INCREMENT de la tabla `roles`
@@ -658,6 +718,8 @@ ALTER TABLE `view_backgrounds`
 -- Filtros para la tabla `connections`
 --
 ALTER TABLE `connections`
+  ADD CONSTRAINT `fk_conn_a_port` FOREIGN KEY (`a_port_id`) REFERENCES `ports` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_conn_b_port` FOREIGN KEY (`b_port_id`) REFERENCES `ports` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_conn_from` FOREIGN KEY (`from_device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_conn_network` FOREIGN KEY (`network_id`) REFERENCES `networks` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_conn_to` FOREIGN KEY (`to_device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE;
@@ -686,6 +748,12 @@ ALTER TABLE `login_attempts`
 --
 ALTER TABLE `ping_logs`
   ADD CONSTRAINT `fk_ping_device` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE;
+
+--
+-- Filtros para la tabla `ports`
+--
+ALTER TABLE `ports`
+  ADD CONSTRAINT `fk_port_device` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE;
 
 --
 -- Filtros para la tabla `sessions`
