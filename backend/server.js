@@ -37,6 +37,7 @@ app.use('/uploads', express.static(UPLOADS_DIR));
 app.use('/api/networks', networksRouter);
 
 app.use('/api/devices', devicesRouter);
+app.use('/api/sites', require('./routes/sites.routes'));
 app.use('/api/connections', connectionsRouter);
 app.use('/api/images', imagesRouter);
 

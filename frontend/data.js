@@ -96,9 +96,16 @@
     if (!res.ok) throw new Error('Error eliminando conexión');
     return res.json();
   }
+
+  async function getSites(networkId) {
+    const data = await fetchJson('/sites?network_id=' + encodeURIComponent(networkId));
+    return data.data || [];
+  }
+
+
   global.API = { getDevices, getConnections, getGraph, 
     createDevice, updateDevice, deleteDevice, 
     createConnection, updateConnection, deleteConnection, 
     getDevice, getConnection, getPorts, 
-    upsertPorts };
+    upsertPorts, getSites };
 })(window);

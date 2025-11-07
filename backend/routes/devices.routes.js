@@ -17,5 +17,6 @@ router.put('/:id',    requireAuth, requirePermission('devices:write'), validate(
 router.delete('/:id', requireAuth, requirePermission('devices:write'), Devices.remove);
 
 router.patch('/:id/ports', requireAuth, requirePermission('devices:write'), Ports.upsert);
+router.patch('/:id/site', requireAuth, requirePermission('devices:write'), Devices.assignSite);
 
 module.exports = router;

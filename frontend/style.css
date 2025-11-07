@@ -77,7 +77,10 @@ body {
   top: 0; 
   z-index: 20;
 }
-
+.modal-backdrop {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
 .brand { 
   display: flex; 
   align-items: center; 
@@ -696,4 +699,148 @@ input[type="password"] {
 }
 .context-menu button:hover {
   background: var(--surface-3);
+}
+
+/* === MODAL MEJORADO PARA DISPOSITIVOS === */
+.modal-dialog--device {
+  width: auto; 
+  max-width: 600px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;  /* Dos columnas para alineación */
+  gap: 16px 20px;  /* Espaciado vertical/horizontal */
+  align-items: start;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 14px;
+  margin-bottom: 0;  /* Alineado con input */
+}
+
+.form-group input,
+.form-group select {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);  /* Focus visible */
+}
+
+.form-group--full {
+  grid-column: 1 / -1;  /* Ocupa ancho completo */
+}
+
+#image-preview img {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+#remove-image {
+  background: var(--danger);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+#remove-image:hover {
+  background: #c0392b;  /* Más oscuro en hover */
+}
+
+/* Estilos para el árbol de sedes (jstree) */
+#site-selector-container {
+  grid-column: 1 / -1;  /* Ocupa ancho completo, después de Ubicación */
+  margin-top: 8px;
+}
+
+#site-selector-container label {
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+  display: block;
+}
+
+#site-tree {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  padding: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+#site-tree .jstree-node {
+  color: var(--text);
+}
+
+#site-tree .jstree-anchor {
+  color: var(--text);
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+#site-tree .jstree-anchor:hover {
+  background: var(--surface-3);
+}
+
+#site-tree .jstree-clicked {
+  background: var(--brand);
+  color: #0b0d12;
+}
+
+/* Input de búsqueda para sedes */
+#site-selector-container input[type="text"] {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+#site-selector-container input[type="text"]:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
+}
+
+/* Form actions alineadas */
+.form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+/* Responsive: En móviles, una columna */
+@media (max-width: 600px) {
+  .form-grid {
+    grid-template-columns: 1fr;  /* Una columna en móviles */
+  }
+
+  .form-group--full {
+    grid-column: auto;  /* Normal en móviles */
+  }
 }

@@ -100,8 +100,8 @@
     }
   }
 
-  function getEnhancedStyles() {
-    const base = baseStyle();
+  function getEnhancedStyles(theme) {
+    const base = baseStyle(theme);
     base.push(
       {
         selector: 'node.highlighted-search',
@@ -147,9 +147,10 @@
           network_id: n.network_id,
           ghost: n.ghost === true ? 'true' : 'false',
           image_id: n.image_id || null,
-          // FIX: agregar ports y ports_summary al data del nodo
           ports: portsArr.length ? portsArr : undefined,
-          ports_summary: finalSummary
+          ports_summary: finalSummary,
+          site_name: n.site_name || null, 
+          site_id: n.site_id || null  
         },
         position: p && hasNum(p.x) && hasNum(p.y) ? { x: Number(p.x), y: Number(p.y) } : undefined
       };
@@ -170,13 +171,14 @@
     return { nodes, edges };
   }
 
-  function baseStyle() {
+  function baseStyle(theme = 'light') {
+    const isDark = theme === 'dark';
     return [
       { selector: 'node',
         style: {
           'width': 36, 'height': 36, 'shape': 'ellipse',
           'background-color': '#bdc3c7', 'border-width': 2, 'border-color': '#95a5a6',
-          'label': 'data(label)', 'font-size': 10, 'font-weight': 600, 'color': '#2c3e50',
+          'label': 'data(label)', 'font-size': 10, 'font-weight': 600, 'color': isDark ? '#ffffff' : '#2c3e50',  // Blanco en oscuro, gris en claro
           'text-wrap': 'wrap', 'text-max-width': 100, 'text-valign': 'bottom', 'text-halign': 'center', 'text-margin-y': 8,
         }
       },
@@ -193,39 +195,40 @@
       { selector: 'node:hover',    style: { 'cursor': 'pointer' } },
       { selector: 'edge',
         style: {
-          'width': 2, 'line-color': '#95a5a6', 'curve-style': 'bezier', 'target-arrow-shape': 'none',
-          'label': 'data(label)', 'font-size': 8, 'text-rotation': 'autorotate', 'color': '#34495e',
+          'width': 2, 'line-color': isDark ? '#bdc3c7' : '#95a5a6',  // Gris claro en oscuro para mejor contraste
+          'curve-style': 'bezier', 'target-arrow-shape': 'none',
+          'label': 'data(label)', 'font-size': 8, 'text-rotation': 'autorotate', 'color': isDark ? '#ffffff' : '#34495e',  // Blanco en oscuro
           'text-margin-y': -5
         }
       },
       { selector: 'node[image_id]',
-      style: {
-        'background-image': (ele) => `/api/images/${ele.data('image_id')}`,
-        'background-fit': 'cover',
-        'background-clip': 'node',
-        'shape': 'rectangle', 
-        'width': 40, 'height': 40
-      }
-    }, 
+        style: {
+          'background-image': (ele) => `/api/images/${ele.data('image_id')}`,
+          'background-fit': 'cover',
+          'background-clip': 'node',
+          'shape': 'rectangle', 
+          'width': 40, 'height': 40
+        }
+      }, 
       { selector: 'node[ghost = "true"]',
-      style: { 
-        'opacity': 0.35,
-        'border-style': 'dashed',
-        'border-color': '#7f8c8d',
-        'background-color': '#95a5a6'
-      }
-    }, 
-    { selector: 'edge[cross = "true"]',
-    style: {
-      'line-style': 'dashed',
-      'opacity': 0.55
-    }
-  }, 
-  { selector: 'edge:selected', 
-      style: { 
-        'line-color': '#3498db', 
-        'width': 3 
-      } }
+        style: { 
+          'opacity': 0.35,
+          'border-style': 'dashed',
+          'border-color': '#7f8c8d',
+          'background-color': '#95a5a6'
+        }
+      }, 
+      { selector: 'edge[cross = "true"]',
+        style: {
+          'line-style': 'dashed',
+          'opacity': 0.55
+        }
+      }, 
+      { selector: 'edge:selected', 
+        style: { 
+          'line-color': '#3498db', 
+          'width': 3 
+        } }
     ];
   }
 
@@ -302,14 +305,15 @@
   function ensure(containerId) {
     const el = document.getElementById(containerId);
     if (!el) { console.warn('Canvas: no existe #' + containerId); return null; }
-  
+    
     let cy = instances.get(containerId);
     if (cy && cy.destroyed()) { cy = null; instances.delete(containerId); }
-  
+    
     if (!cy) {
+      const theme = document.documentElement.dataset.theme || 'light';  // Obtener tema actual
       cy = cytoscape({
         container: el,
-        style: getEnhancedStyles(),
+        style: getEnhancedStyles(theme),  // Usar tema en estilos iniciales
         wheelSensitivity: 0.2,
         boxSelectionEnabled: true,
         selectionType: 'single',
@@ -415,6 +419,14 @@
     return cy;
   }
 
+  function updateTheme(containerId, theme) {
+    const cy = instances.get(containerId);
+    if (cy) {
+      const newStyle = getEnhancedStyles(theme);
+      cy.style(newStyle);  // Aplicar nuevos estilos dinámicamente
+    }
+  }
+
   function debounce(fn, wait){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(null,a), wait); }; }
 
   function wireTooltips(cy) {
@@ -432,8 +444,10 @@
     const ports = d.ports || [];
     let summary = d.ports_summary || { total: ports.length, used: ports.filter(p => p.connected === true).length };
     const free = (summary.total || 0) - (summary.used || 0);
-    let lines = [`${d.label || d.name || node.id()}`, `Puertos: ${summary.total} total • ${summary.used || 0} usados • ${free} libres`];
-    if (ports && ports.length) {
+    let lines = [`${d.label || d.name || node.id()}`];
+    if (d.site_name) lines.push(`Sede: ${d.site_name}`);
+    else lines.push('Sin sede');
+    lines.push(`Puertos: ${summary.total} total • ${summary.used || 0} usados • ${free} libres`);    if (ports && ports.length) {
       const topPorts = ports.slice(0, 10).map(p => {
         // FIX: Solo usar connected para determinar usado
         const used = (p.connected === true) ? 'usado' : 'libre';
@@ -531,6 +545,7 @@
     zoomOut, 
     fitView, 
     toggleBackground, 
-    searchNodes 
+    searchNodes,
+    updateTheme
   };
 })(window);

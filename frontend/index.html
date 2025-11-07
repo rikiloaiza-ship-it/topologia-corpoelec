@@ -29,6 +29,9 @@
       }catch(e){}
     })();
   </script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/themes/default/style.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/jstree.min.js"></script>  
 </head>
 <body>
   <!-- Radios para tabs (CSS-only) -->
@@ -100,51 +103,80 @@
       </div>
     </div>
 
-    <!-- Después del modal de login, agregar modales CRUD -->
-<div class="modal" id="device-modal" aria-hidden="true" role="dialog" aria-labelledby="device-title" aria-modal="true" hidden>
-  <div class="modal-backdrop" data-close="modal"></div>
-  <div class="modal-dialog">
-    <button class="modal-close" id="device-close" aria-label="Cerrar">×</button>
-    <h2 id="device-title">Agregar/Editar Dispositivo</h2>
-    <form id="device-form" autocomplete="off">
-      <input type="hidden" id="device-id" />
-
-      
-      <label for="device-name">Nombre</label>
-      <input name="name" id="device-name" required />
-      <label for="device-image">Imagen (opcional)</label>
-      <input type="file" id="device-image" accept="image/*" />
-      <div id="image-preview" style="margin-top: 10px; display: none;">
-        <img id="preview-img" style="max-width: 100px; max-height: 100px; border: 1px solid #ccc;" alt="Vista previa" />
-        <button type="button" id="remove-image" style="margin-left: 10px;">Quitar</button>
+    <div class="modal" id="device-modal" aria-hidden="true" role="dialog" aria-labelledby="device-title" aria-modal="true" hidden>
+      <div class="modal-backdrop" data-close="modal"></div>
+      <div class="modal-dialog modal-dialog--device">  <!-- Añadí clase para styling específico -->
+        <button class="modal-close" id="device-close" aria-label="Cerrar">×</button>
+        <h2 id="device-title">Agregar/Editar Dispositivo</h2>
+        <form id="device-form" autocomplete="off" class="form-grid">  <!-- Añadí clase para grid layout -->
+          <input type="hidden" id="device-id" />
+    
+          <!-- Grupo: Información básica -->
+          <div class="form-group">
+            <label for="device-name">Nombre</label>
+            <input name="name" id="device-name" required />
+          </div>
+    
+          <div class="form-group">
+            <label for="device-type">Tipo</label>
+            <select id="device-type" required>
+              <option value="">Seleccionar...</option>
+              <option value="ap">AP</option>
+              <option value="switch">Switch</option>
+            </select>
+          </div>
+    
+          <!-- Grupo: Redes -->
+          <div class="form-group">
+            <label for="device-ip">IP</label>
+            <input name="ip_address" id="device-ip" type="text" />
+          </div>
+    
+          <div class="form-group">
+            <label for="device-mac">MAC</label>
+            <input name="mac_address" id="device-mac" type="text" />
+          </div>
+    
+          <!-- Grupo: Ubicación -->
+          <div class="form-group">
+            <label for="device-location">Ubicación</label>
+            <input name="location" id="device-location" type="text" />
+          </div>
+          <!-- Aquí se inserta dinámicamente el site-selector-container (árbol de sedes) -->
+    
+          <!-- Grupo: Puertos -->
+          <div class="form-group">
+            <label for="device-ports-count">Número de Puertos</label>
+            <input type="number" id="device-ports-count" min="0" max="48" />
+          </div>
+    
+          <div class="form-group">
+            <label for="device-ports-type">Tipo de Puertos</label>
+            <select id="device-ports-type">
+              <option value="fast-ethernet">Fast Ethernet</option>
+              <option value="gigabit-ethernet">Gigabit Ethernet</option>
+              <option value="wifi">WiFi</option>
+            </select>
+          </div>
+    
+          <!-- Grupo: Imagen (opcional, al final) -->
+          <div class="form-group form-group--full">
+            <label for="device-image">Imagen (opcional)</label>
+            <input type="file" id="device-image" accept="image/*" />
+            <div id="image-preview" style="margin-top: 10px; display: none;">
+              <img id="preview-img" style="max-width: 100px; max-height: 100px; border: 1px solid var(--border); border-radius: 8px;" alt="Vista previa" />
+              <button type="button" id="remove-image" style="margin-left: 10px; padding: 4px 8px; border-radius: 4px;">Quitar</button>
+            </div>
+          </div>
+    
+          <div class="form-actions">
+            <button type="submit" class="btn btn--primary" id="device-submit">Guardar</button>
+            <button type="button" class="btn" id="device-cancel">Cancelar</button>
+          </div>
+        </form>
       </div>
-      <label for="device-type">Tipo</label>
-      <select id="device-type" required>
-        <option value="">Seleccionar...</option>
-        <option value="ap">AP</option>
-        <option value="switch">Switch</option>
-      </select>
-      <label for="device-ip">IP</label>
-      <input name="ip_address" id="device-ip" type="text" />
-      <label for="device-mac">MAC</label>
-      <input name="mac_address" id="device-mac" type="text" />
-      <label for="device-location">Ubicación</label>
-      <input name="location" id="device-location" type="text" />
-      <label for="device-ports-count">Número de Puertos</label>
-      <input type="number" id="device-ports-count" min="0" max="48" />
-      <label for="device-ports-type">Tipo de Puertos</label>
-      <select id="device-ports-type">
-        <option value="fast-ethernet">Fast Ethernet</option>
-        <option value="gigabit-ethernet">Gigabit Ethernet</option>
-        <option value="wifi">WiFi</option>
-      </select>
-      <div class="form-actions">
-        <button type="submit" class="btn btn--primary" id="device-submit">Guardar</button>
-        <button type="button" class="btn" id="device-cancel">Cancelar</button>
-      </div>
-    </form>
-  </div>
-</div>
+    </div>
+    
 
 <div class="modal" id="connection-modal" aria-hidden="true" role="dialog" aria-labelledby="connection-title" aria-modal="true" hidden>
   <div class="modal-backdrop" data-close="modal"></div>

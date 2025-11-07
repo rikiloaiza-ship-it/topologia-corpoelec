@@ -11,7 +11,14 @@
     if (persist) try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
     const btn = document.getElementById('theme-toggle');
     if (btn) btn.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+    
+    // Actualizar estilos de grafos activos
+    if (window.Canvas?.updateTheme) {
+      window.Canvas.updateTheme('canvas-wifi', theme);
+      window.Canvas.updateTheme('canvas-switches', theme);
+    }
   }
+  
   function getStoredTheme() { try { return localStorage.getItem(THEME_KEY); } catch { return null; } }
   function getSystemTheme() { const m = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null; return (m && m.matches) ? 'dark' : 'light'; }
 
@@ -267,11 +274,90 @@
     const previewDiv = document.getElementById('image-preview');
     const previewImg = document.getElementById('preview-img');
     const removeBtn = document.getElementById('remove-image');
+    
+    // Limpiar cualquier contenedor de sede existente para evitar repeticiones
+    const existingContainer = document.getElementById('site-selector-container');
+    if (existingContainer) {
+      existingContainer.remove();
+    }
+    
+    // Obtener sedes con jerarquía (asume API.getSites devuelve array con id, name, parent_id)
+    const sites = await API.getSites(networkId);
+    
+    // Crear contenedor para el selector de sede (árbol con búsqueda)
+    const siteContainer = document.createElement('div');
+    siteContainer.id = 'site-selector-container';
+    const siteLabel = document.createElement('label');
+    siteLabel.textContent = 'Sede (con búsqueda y árbol)';
+    const siteDiv = document.createElement('div');
+    siteDiv.id = 'site-tree';
+    siteContainer.appendChild(siteLabel);
+    siteContainer.appendChild(siteDiv);
+    
+    // Insertar después de device-location
+    const locationEl = document.getElementById('device-location');
+    locationEl.insertAdjacentElement('afterend', siteContainer);
+    
+    // Estructurar datos para jstree (convertir array plano a árbol)
+    const treeData = sites.map(s => ({
+      id: s.id.toString(),
+      text: s.name,
+      parent: s.parent_id ? s.parent_id.toString() : '#',  // '#' para raíces
+      data: { site_id: s.id }  // Extra data si necesitas
+    }));
+    
+    // Inicializar jstree con búsqueda
+    $('#site-tree').jstree({
+      core: {
+        data: treeData,
+        themes: { responsive: true }
+      },
+      plugins: ['search'],  // Plugin para búsqueda integrada
+      search: {
+        show_only_matches: true,
+        show_only_matches_children: true
+      }
+    });
+    
+    // Añadir input de búsqueda encima del árbol
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Buscar sede...';
+    searchInput.style.marginBottom = '10px';
+    siteContainer.insertBefore(searchInput, siteDiv);
+    
+    // Evento para búsqueda en jstree
+    searchInput.addEventListener('keyup', function() {
+      $('#site-tree').jstree('search', this.value);
+    });
+    
+    // Evento para selección en jstree (guardar ID seleccionado)
+    $('#site-tree').on('select_node.jstree', function(e, data) {
+      const selectedId = data.node.id;
+      // Guardar en un campo oculto para el form
+      let hiddenField = document.getElementById('device-site-hidden');
+      if (!hiddenField) {
+        hiddenField = document.createElement('input');
+        hiddenField.type = 'hidden';
+        hiddenField.id = 'device-site-hidden';
+        hiddenField.name = 'site_id';
+        form.appendChild(hiddenField);
+      }
+      hiddenField.value = selectedId;
+    });
+    
+    // Para edición: Preseleccionar la sede en jstree después de inicializar
+    if (device && device.site_id) {
+      $('#site-tree').on('ready.jstree', function() {
+        $('#site-tree').jstree('select_node', device.site_id.toString());
+      });
+    }
+    
+    // Resto del código (manejo de imagen, puertos, etc.) igual...
     if (device && device.image_id) {
-
       previewImg.src = `/api/images/${device.image_id}`;
       previewDiv.style.display = 'block';
-      imageInput.value = ''; 
+      imageInput.value = '';
     } else {
       previewDiv.style.display = 'none';
     }
@@ -287,39 +373,38 @@
       imageInput.value = '';
       previewDiv.style.display = 'none';
     });
-
+    
     if (device) {
       console.log('Device data:', device);
       if (title) title.textContent = 'Editar Dispositivo';
       document.getElementById('device-id').value = device.id;
-      document.getElementById('device-name').value = device.name;  
-      document.getElementById('device-type').value = device.device_type;  
-      document.getElementById('device-ip').value = device.ip_address || ''; 
-      document.getElementById('device-mac').value = device.mac_address || ''; 
+      document.getElementById('device-name').value = device.name;
+      document.getElementById('device-type').value = device.device_type;
+      document.getElementById('device-ip').value = device.ip_address || '';
+      document.getElementById('device-mac').value = device.mac_address || '';
       document.getElementById('device-location').value = device.location || '';
-    // Nuevo: Cargar puertos existentes
-    try {
-      const ports = await API.getPorts(device.id); // Asume que API.getPorts existe en data.js
-      if (ports && ports.length > 0) {
-        const portsCountEl = document.getElementById('device-ports-count');
-        const portsTypeEl = document.getElementById('device-ports-type');
-        if (portsCountEl) portsCountEl.value = ports.length;
-        if (portsTypeEl) portsTypeEl.value = ports[0].kind || 'gigabit-ethernet'; // Asume tipo uniforme
-        // Nota: Para edición avanzada, podrías mostrar lista de puertos, pero por ahora solo count/type
-      } else {
-        document.getElementById('device-ports-count').value = '';
-        document.getElementById('device-ports-type').value = 'gigabit-ethernet';
+      // Puertos (igual)
+      try {
+        const ports = await API.getPorts(device.id);
+        if (ports && ports.length > 0) {
+          const portsCountEl = document.getElementById('device-ports-count');
+          const portsTypeEl = document.getElementById('device-ports-type');
+          if (portsCountEl) portsCountEl.value = ports.length;
+          if (portsTypeEl) portsTypeEl.value = ports[0].kind || 'gigabit-ethernet';
+        } else {
+          document.getElementById('device-ports-count').value = '';
+          document.getElementById('device-ports-type').value = 'gigabit-ethernet';
+        }
+      } catch (err) {
+        console.error('Error cargando puertos:', err);
       }
-    } catch (err) {
-      console.error('Error cargando puertos:', err);
+    } else {
+      if (title) title.textContent = 'Agregar Dispositivo';
+      if (form) form.reset();
+      const idEl = document.getElementById('device-id'); if (idEl) idEl.value = '';
     }
-  } else {
-    if (title) title.textContent = 'Agregar Dispositivo';
-    if (form) form.reset();
-    const idEl = document.getElementById('device-id'); if (idEl) idEl.value = '';
+    if (modal) { modal.hidden = false; modal.setAttribute('aria-hidden', 'false'); }
   }
-  if (modal) { modal.hidden = false; modal.setAttribute('aria-hidden', 'false'); }
-}
   
   async function openConnectionModal(connection = null) {
     const modal = document.getElementById('connection-modal');
@@ -459,7 +544,7 @@
     data.mac_address = document.getElementById('device-mac')?.value || null;
     data.location = document.getElementById('device-location')?.value || null;
     data.image_id = imageId;
-  
+    data.site_id = document.getElementById('device-site-hidden')?.value ? parseInt(document.getElementById('device-site-hidden').value, 10) : null;
     try {
       if (id) await API.updateDevice(id, data);
       else await API.createDevice(data);

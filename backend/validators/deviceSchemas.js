@@ -9,6 +9,8 @@ const createDevice = Joi.object({
   mac_address: Joi.string().max(50).allow(null, '').optional(),
   location: Joi.string().max(255).allow(null, '').optional(),
   image_id: Joi.number().integer().positive().allow(null).optional(),
+  site_id: Joi.number().integer().positive().allow(null).optional()  // Añadido: ID de sede, opcional y nullable
+    .messages({ 'number.base': 'site_id debe ser un número' }),
   metadata: Joi.any().optional(),
   ports: Joi.array().items(Joi.object({
     name: Joi.string().required(),
@@ -28,6 +30,8 @@ const updateDevice = Joi.object({
   mac_address: Joi.string().max(50).allow(null, '').optional(),
   location: Joi.string().max(255).allow(null, '').optional(),
   image_id: Joi.number().integer().positive().allow(null).optional(),
+  site_id: Joi.number().integer().positive().allow(null).optional()  // Añadido: ID de sede, opcional y nullable
+    .messages({ 'number.base': 'site_id debe ser un número' }),
   metadata: Joi.any().optional()
 }).min(1).messages({ 'object.min': 'Nada para actualizar' });
 

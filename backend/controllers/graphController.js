@@ -61,8 +61,10 @@ async function getGraphByNetwork(req, res) {
         mac: d.mac_address,
         location: d.location,
         image_id: d.image_id,
+        site_id: d.site_id,
+        site_name: d.site_name || null,  // Añadido
         metadata: tryParseMeta(d.metadata),
-        ports: enrichedPorts, // Incluir para tooltip detallado
+        ports: enrichedPorts,
         ports_summary: { total, used }
       };
     });
