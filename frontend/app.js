@@ -3,7 +3,7 @@
   const root = document.documentElement;
   window.connectMode = false;
   window.selectedPortA = null;
-  let tooltipEl = null; // Para el tooltip de puertos
+  let tooltipEl = null;
 
   function applyTheme(theme, persist) {
     root.dataset.theme = theme;
@@ -12,7 +12,6 @@
     const btn = document.getElementById('theme-toggle');
     if (btn) btn.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
     
-    // Actualizar estilos de grafos activos
     if (window.Canvas?.updateTheme) {
       window.Canvas.updateTheme('canvas-wifi', theme);
       window.Canvas.updateTheme('canvas-switches', theme);
@@ -107,11 +106,84 @@
     }
   }
   
+  function initSitePanel() {
+    const networkId = new URLSearchParams(location.search).get('network_id') || '1';
+    const panel = document.createElement('div');
+    panel.id = 'site-panel';
+    panel.innerHTML = `
+      <h3>Vista por Sede</h3>
+      <div id="site-tree"></div>
+      <!-- NUEVO: Toggle para conexiones inter-sede -->
+      <label style="margin-top: 10px; display: block;">
+        <input type="checkbox" id="show-inter-site" checked> Mostrar conexiones inter-sede
+      </label>
+    `;
+    
+
+    panel.style.backgroundColor = 'var(--surface-1)'; 
+    panel.style.border = '1px solid var(--border)';
+    panel.style.borderRadius = '8px';
+    panel.style.padding = '10px';
+    
+    const main = document.querySelector('.app-main');
+    main.insertBefore(panel, main.firstElementChild); 
+    
+    API.getSites(networkId).then(sites => {
+      const treeData = [
+        {
+          id: 'general',
+          text: 'General',
+          parent: '#',
+          data: { site_id: null }
+        },
+        ...sites.map(s => ({
+          id: s.id.toString(),
+          text: s.name,
+          parent: s.parent_id ? s.parent_id.toString() : '#',
+          data: { site_id: s.id }
+        }))
+      ];
+      
+ 
+      $('#site-tree').jstree({
+        core: {
+          data: treeData,
+          themes: { responsive: true }
+        },
+        plugins: ['types', 'state'], 
+        types: {
+          default: { icon: 'jstree-folder' }, 
+          leaf: { icon: 'jstree-file' }  
+        },
+        state: { key: 'site-tree' }
+      });
+      
+      $('#site-tree').on('ready.jstree', function() {
+        $('#site-tree').jstree('open_all');
+      });
+      
+      $('#site-tree').on('select_node.jstree', function(e, data) {
+        const selectedId = data.node.data.site_id; 
+        GRAPH_CACHE.clear();
+        const showInter = document.getElementById('show-inter-site').checked;
+        loadGraphFor(getCurrentView(), selectedId, { showInterSite: showInter });
+        
+      });
+      
+      document.getElementById('show-inter-site').addEventListener('change', (e) => {
+        GRAPH_CACHE.clear();
+        const showInter = e.target.checked;
+        loadGraphFor(getCurrentView(), getCurrentSiteId(), { showInterSite: showInter });
+      });
+    }).catch(err => console.error('Error cargando sedes:', err));
+  }
+  
+  
   async function handleExportExcel() {
     try {
       const networkId = new URLSearchParams(location.search).get('network_id') || '1';
       const view = getCurrentView(); 
-      const full = await fetchFullGraph(networkId);
+      const full = await fetchFullGraph(networkId, getCurrentSiteId()); 
       const projected = projectGraphForView(full, view);
         const nodesData = (projected.nodes || []).map(n => ({
         ID: n.id,
@@ -135,14 +207,12 @@
         Red_ID: e.network_id
       }));
   
-      // Crear workbook
       const wb = XLSX.utils.book_new();
       const wsNodes = XLSX.utils.json_to_sheet(nodesData);
       const wsEdges = XLSX.utils.json_to_sheet(edgesData);
       XLSX.utils.book_append_sheet(wb, wsNodes, 'Nodos');
       XLSX.utils.book_append_sheet(wb, wsEdges, 'Enlaces');
   
-      // Generar archivo y descargar
       const fileName = `grafo_red_${networkId}_${view}_${new Date().toISOString().split('T')[0]}.xlsx`;
       XLSX.writeFile(wb, fileName);
   
@@ -156,13 +226,12 @@
   function bindCRUDButtons() {
     const addDeviceBtn = document.getElementById('add-device');
     const addConnectionBtn = document.getElementById('add-connection');
-    const connectBtn = document.getElementById('connect-ports-btn'); // Nuevo botón para modo conectar
+    const connectBtn = document.getElementById('connect-ports-btn'); 
     if (connectBtn) {
       connectBtn.addEventListener('click', () => {
         window.connectMode = true;
         window.selectedPortA = null;
         setStatus('Modo conectar: selecciona dispositivo origen (puerto libre)', false);
-        // Desactiva otros eventos si es necesario (ej. modal de conexión)
       });
     }
   
@@ -256,7 +325,7 @@
               await API.deleteConnection(id);
             }
             GRAPH_CACHE.clear();
-            await loadGraphFor(getCurrentView());
+            await loadGraphFor(getCurrentView(), getCurrentSiteId())
           } catch (err) {
             alert('Error eliminando: ' + err.message);
           }
@@ -275,16 +344,14 @@
     const previewImg = document.getElementById('preview-img');
     const removeBtn = document.getElementById('remove-image');
     
-    // Limpiar cualquier contenedor de sede existente para evitar repeticiones
     const existingContainer = document.getElementById('site-selector-container');
     if (existingContainer) {
       existingContainer.remove();
     }
     
-    // Obtener sedes con jerarquía (asume API.getSites devuelve array con id, name, parent_id)
     const sites = await API.getSites(networkId);
     
-    // Crear contenedor para el selector de sede (árbol con búsqueda)
+
     const siteContainer = document.createElement('div');
     siteContainer.id = 'site-selector-container';
     const siteLabel = document.createElement('label');
@@ -294,47 +361,42 @@
     siteContainer.appendChild(siteLabel);
     siteContainer.appendChild(siteDiv);
     
-    // Insertar después de device-location
+
     const locationEl = document.getElementById('device-location');
     locationEl.insertAdjacentElement('afterend', siteContainer);
     
-    // Estructurar datos para jstree (convertir array plano a árbol)
+
     const treeData = sites.map(s => ({
       id: s.id.toString(),
       text: s.name,
-      parent: s.parent_id ? s.parent_id.toString() : '#',  // '#' para raíces
-      data: { site_id: s.id }  // Extra data si necesitas
+      parent: s.parent_id ? s.parent_id.toString() : '#', 
+      data: { site_id: s.id } 
     }));
     
-    // Inicializar jstree con búsqueda
     $('#site-tree').jstree({
       core: {
         data: treeData,
         themes: { responsive: true }
       },
-      plugins: ['search'],  // Plugin para búsqueda integrada
+      plugins: ['search'], 
       search: {
         show_only_matches: true,
         show_only_matches_children: true
       }
     });
     
-    // Añadir input de búsqueda encima del árbol
     const searchInput = document.createElement('input');
     searchInput.type = 'text';
     searchInput.placeholder = 'Buscar sede...';
     searchInput.style.marginBottom = '10px';
     siteContainer.insertBefore(searchInput, siteDiv);
     
-    // Evento para búsqueda en jstree
     searchInput.addEventListener('keyup', function() {
       $('#site-tree').jstree('search', this.value);
     });
     
-    // Evento para selección en jstree (guardar ID seleccionado)
     $('#site-tree').on('select_node.jstree', function(e, data) {
       const selectedId = data.node.id;
-      // Guardar en un campo oculto para el form
       let hiddenField = document.getElementById('device-site-hidden');
       if (!hiddenField) {
         hiddenField = document.createElement('input');
@@ -346,14 +408,12 @@
       hiddenField.value = selectedId;
     });
     
-    // Para edición: Preseleccionar la sede en jstree después de inicializar
     if (device && device.site_id) {
       $('#site-tree').on('ready.jstree', function() {
         $('#site-tree').jstree('select_node', device.site_id.toString());
       });
     }
     
-    // Resto del código (manejo de imagen, puertos, etc.) igual...
     if (device && device.image_id) {
       previewImg.src = `/api/images/${device.image_id}`;
       previewDiv.style.display = 'block';
@@ -383,7 +443,6 @@
       document.getElementById('device-ip').value = device.ip_address || '';
       document.getElementById('device-mac').value = device.mac_address || '';
       document.getElementById('device-location').value = device.location || '';
-      // Puertos (igual)
       try {
         const ports = await API.getPorts(device.id);
         if (ports && ports.length > 0) {
@@ -473,7 +532,7 @@
       if (id) await API.updateConnection(id, data);
       else await API.createConnection(data);
       GRAPH_CACHE.clear();
-      await loadGraphFor(getCurrentView());
+      await loadGraphFor(getCurrentView(), getCurrentSiteId())
       closeModal(document.getElementById('connection-modal'));
     } catch (err) {
       alert('Error: ' + err.message);
@@ -501,10 +560,8 @@
       return;
     }
   
-    // Inicializa data como objeto vacío
     let data = {};
   
-    // Agrega puertos si hay
     if (portsCount > 0) {
       data.ports = [];
       for (let i = 1; i <= portsCount; i++) {
@@ -517,7 +574,6 @@
       }
     }
   
-    // Maneja la imagen
     if (imageInput.files[0]) {
       const formData = new FormData();
       formData.append('image', imageInput.files[0]);
@@ -536,7 +592,6 @@
       }
     }
   
-    // Completa data con el resto de campos
     data.network_id = networkId;
     data.name = document.getElementById('device-name')?.value;
     data.device_type = document.getElementById('device-type')?.value;
@@ -549,7 +604,7 @@
       if (id) await API.updateDevice(id, data);
       else await API.createDevice(data);
       GRAPH_CACHE.clear();
-      await loadGraphFor(getCurrentView());
+      await loadGraphFor(getCurrentView(), getCurrentSiteId())
       closeModal(document.getElementById('device-modal'));
     } catch (err) {
       alert('Error: ' + err.message);
@@ -575,17 +630,24 @@
       if (type === 'device') await API.deleteDevice(id);
       else await API.deleteConnection(id);
       GRAPH_CACHE.clear();
-      await loadGraphFor(getCurrentView());
+      await loadGraphFor(getCurrentView(), getCurrentSiteId())
       closeModal(modal);
     } catch (err) {
       alert('Error: ' + err.message);
     }
   }
   
+  
   function getCurrentView() {
     const tabWifi = document.getElementById('tab-wifi');
     return tabWifi && tabWifi.checked ? 'wifi' : 'switches';
   }
+
+  function getCurrentSiteId() {
+    const selector = document.getElementById('site-selector');
+    return selector ? (selector.value || null) : null;
+  }
+
   function handleZoomIn() {
     const containerId = getActiveContainerId();
     if (window.Canvas?.zoomIn) {
@@ -680,12 +742,14 @@ function getActiveContainerId() {
     } catch (_) { badge.textContent = 'Usuario'; }
   }
 
+  initSitePanel();
+
   function bindTabsSafely() {
     const rWifi = document.getElementById('tab-wifi');
     const rSw   = document.getElementById('tab-switches');
     if (!rWifi && !rSw) return;
-    if (rWifi) rWifi.addEventListener('change', () => { if (rWifi.checked) setViewAndLoad('wifi'); });
-    if (rSw)   rSw.addEventListener('change',   () => { if (rSw.checked)   setViewAndLoad('switches'); });
+    if (rWifi) rWifi.addEventListener('change', () => { if (rWifi.checked) setViewAndLoad('wifi'); }); 
+    if (rSw)   rSw.addEventListener('change',   () => { if (rSw.checked)   setViewAndLoad('switches'); }); 
   }
 
   async function initViewFromQuerySafely() {
@@ -694,31 +758,35 @@ function getActiveContainerId() {
                             document.querySelector('#canvas-switches') ||
                             document.getElementById('canvas');
     if (!hasViewControls) return;
-
+  
     const params = new URLSearchParams(location.search);
     const view = params.get('view') || 'all';
-    const tabId = view === 'switches' ? 'tab-switches' : 'tab-wifi'; const target = document.getElementById(tabId);    if (target) target.checked = true;
+    const tabId = view === 'switches' ? 'tab-switches' : 'tab-wifi'; 
+    const target = document.getElementById(tabId);    
+    if (target) target.checked = true;
     if (view === 'all') {
-      await loadGraphFor('all');
+      await loadGraphFor('all', getCurrentSiteId());
     } else {
-      await loadGraphFor(view === 'switches' ? 'switches' : 'wifi');
+      await loadGraphFor(view === 'switches' ? 'switches' : 'wifi', getCurrentSiteId());
     }
   }
+  
 
   function setViewAndLoad(view) {
     const params = new URLSearchParams(location.search);
     if (view === 'all') params.delete('view'); else params.set('view', view);
     const url = location.pathname + (params.toString() ? '?' + params.toString() : '');
     history.replaceState({}, '', url);
-    loadGraphFor(view);
+    loadGraphFor(view, getCurrentSiteId());
   }
 
 const GRAPH_CACHE = new Map();
 
-async function fetchFullGraph(networkId) {
-  if (GRAPH_CACHE.has(networkId)) return GRAPH_CACHE.get(networkId);
-  const full = await API.getGraph(networkId, {}); 
-  GRAPH_CACHE.set(networkId, full);
+async function fetchFullGraph(networkId, siteId = null) {
+  const cacheKey = `${networkId}_${siteId || 'general'}`; 
+  if (GRAPH_CACHE.has(cacheKey)) return GRAPH_CACHE.get(cacheKey);
+  const full = await API.getGraph(networkId, { site_id: siteId }); 
+  GRAPH_CACHE.set(cacheKey, full);
   return full;
 }
 
@@ -726,7 +794,6 @@ async function computeNodePortsSummary(deviceId) {
   try {
     const ports = await API.getPorts(deviceId);
     const total = ports.length;
-    // FIX: Solo contar conectados como usados
     const used = ports.filter(p => p.connected === true).length;
     return { ports, ports_summary: { total, used } };
   } catch (e) {
@@ -748,7 +815,7 @@ function nodeCategory(type) {
   return 'other';
 }
 
-function projectGraphForView(full, view) {
+function projectGraphForView(full, view, opts = {}) {
   if (!full) return { network_id: null, nodes: [], edges: [], counts: { nodes: 0, edges: 0 }, kind: 'all' };
 
   if (view === 'all') {
@@ -766,13 +833,16 @@ function projectGraphForView(full, view) {
   const primaryNodes = nodes.filter(n => nodeCategory(n.type) === desired);
   const primaryIds = new Set(primaryNodes.map(n => String(n.id)));
 
-  const viewEdges = edges
+  let viewEdges = edges  
     .filter(e => primaryIds.has(String(e.source)) || primaryIds.has(String(e.target)))
     .map(e => {
       const sIn = primaryIds.has(String(e.source));
       const tIn = primaryIds.has(String(e.target));
       return { ...e, cross: (sIn && !tIn) || (!sIn && tIn) }; 
     });
+  if (opts.showInterSite === false) {
+    viewEdges = viewEdges.filter(e => e.cross !== true);
+  }
 
   const neededIds = new Set();
   viewEdges.forEach(e => { neededIds.add(String(e.source)); neededIds.add(String(e.target)); });
@@ -787,20 +857,22 @@ function projectGraphForView(full, view) {
     kind: desired,
     nodes: viewNodes,
     edges: viewEdges,
-    counts: { nodes: viewNodes.length, edges: viewEdges.length }
+    counts: { nodes: viewNodes.length, edges: viewNodes.length }
   };
 }
 
 
-async function loadGraphFor(view) {
+async function loadGraphFor(view, siteId, opts = {}) {
   try {
+    if (!siteId) siteId = getCurrentSiteId();  
+    if (siteId === undefined) siteId = getCurrentSiteId(); 
     const params = new URLSearchParams(location.search);
     const networkId = params.get('network_id') || '1';
     const label = view === 'wifi' ? 'WiFi' : (view === 'switches' ? 'Red Corporativa' : 'Todo');
     if (typeof setStatus === 'function') setStatus(`Cargando red ${networkId} (${label})…`);
 
-    const full = await fetchFullGraph(networkId);
-    let projected = projectGraphForView(full, view);
+    const full = await fetchFullGraph(networkId, siteId); 
+    let projected = projectGraphForView(full, view, opts);  
     const containerId = view === 'switches' ? 'canvas-switches' : 'canvas-wifi';
     const otherId = containerId === 'canvas-wifi' ? 'canvas-switches' : 'canvas-wifi';
     if (document.getElementById(otherId)) {
@@ -811,7 +883,8 @@ async function loadGraphFor(view) {
     if (window.Canvas?.renderGraph) {
       window.Canvas.renderGraph(projected, { 
         containerId: containerId,
-        viewType: view
+        viewType: view,
+        siteId: siteId
       });
     } else {
       document.dispatchEvent(new CustomEvent('graph:loaded', { detail: { ...projected, _containerId: containerId } }));
@@ -824,6 +897,7 @@ async function loadGraphFor(view) {
     if (typeof setStatus === 'function') setStatus('Error al cargar grafo: ' + (e?.message || 'desconocido'), true);
   }
 }
+
 
 
 function showContextMenu(x, y, type, id) {
@@ -877,11 +951,9 @@ document.addEventListener('node:contextmenu', function(evt) {
     showContextMenu(position.x, position.y, 'connection', edgeData.id);
   });
   
-// Nueva función para selección de puertos en modo conectar
 async function openPortSelectionModal(deviceId, portType) {
   const ports = await API.getPorts(deviceId);
-  // FIX: criterio de puerto libre robusto: no conectado Y no "up" en admin activo
-  const freePorts = ports.filter(p => !p.connected); // FIX: Solo excluir conectados (no importa oper_status)
+  const freePorts = ports.filter(p => !p.connected); 
 
   if (freePorts.length === 0) {
     alert('No hay puertos libres en este dispositivo.');
@@ -904,7 +976,6 @@ async function openPortSelectionModal(deviceId, portType) {
     const selectedPortIdStr = document.getElementById('port-select').value;
     const selectedPort = freePorts.find(p => String(p.id) === String(selectedPortIdStr));
     if (portType === 'A') {
-      // FIX: guarda nombre y fuerza tipos numéricos
       window.selectedPortA = { 
         deviceId: parseInt(deviceId, 10), 
         portId: parseInt(selectedPortIdStr, 10),
@@ -916,13 +987,11 @@ async function openPortSelectionModal(deviceId, portType) {
       const bPortId = parseInt(selectedPortIdStr, 10);
       const bPortName = selectedPort?.name || null;
       const data = {
-        // FIX: castear a enteros evita que el backend ignore campos y los deje como NULL
         network_id: networkId,
         from_device_id: parseInt(window.selectedPortA.deviceId, 10),
         to_device_id: parseInt(deviceId, 10),
         a_port_id: parseInt(window.selectedPortA.portId, 10),
         b_port_id: bPortId,
-        // Opcional si tu API los acepta; si no, será ignorado sin problema.
         a_port_name: window.selectedPortA.portName || null,
         b_port_name: bPortName,
         link_type: 'ethernet',
@@ -931,7 +1000,7 @@ async function openPortSelectionModal(deviceId, portType) {
       try {
         await API.createConnection(data);
         GRAPH_CACHE.clear();
-        await loadGraphFor(getCurrentView());
+        await loadGraphFor(getCurrentView(), getCurrentSiteId());
         window.connectMode = false;
         window.selectedPortA = null;
         setStatus('Conexión creada.', false);

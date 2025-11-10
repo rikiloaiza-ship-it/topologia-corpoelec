@@ -1,6 +1,6 @@
 const Devices = require('../models/devices');
 const Connections = require('../models/connections');
-const Ports = require('../models/ports'); // Añade esta importación
+const Ports = require('../models/ports'); 
 
 function tryParseMeta(v) {
   if (v === null || v === undefined) return null;
@@ -30,19 +30,32 @@ async function getGraphByNetwork(req, res) {
     const networkId = req.params.networkId;
     if (!networkId) return res.status(400).json({ error: 'networkId requerido' });
 
-    const { kind } = req.query; // wifi | switches | undefined
+    const { kind, site_id } = req.query;
 
     const [devices, connections] = await Promise.all([
       Devices.listDevicesByNetwork(networkId),
       Connections.listConnectionsByNetwork(networkId)
     ]);
 
-    const nodesPromises = devices.map(async (d) => {
-      // Filtrar conexiones activas ('up') para este dispositivo
+    let filteredDevices = devices;
+    if (site_id) {
+      filteredDevices = devices.filter(d => d.site_id == site_id);
+      let tempEdges = connections.map(c => ({
+        id: c.id,
+        source: c.from_device_id,
+        target: c.to_device_id
+      }));
+      const siteNodeIds = new Set(filteredDevices.map(d => d.id));
+      tempEdges = tempEdges.filter(e => siteNodeIds.has(e.source));
+      const externalTargets = new Set(tempEdges.map(e => e.target).filter(id => !siteNodeIds.has(id)));
+      const externalNodes = devices.filter(d => externalTargets.has(d.id)).map(d => ({ ...d, ghost: true, invisible: true }));
+      filteredDevices = [...filteredDevices, ...externalNodes];
+    }
+
+    const nodesPromises = filteredDevices.map(async (d) => {
       const deviceConnections = connections.filter(c => c.status === 'up' && (c.from_device_id === d.id || c.to_device_id === d.id));
       const deviceConnectedPorts = new Set();
       deviceConnections.forEach(c => {
-        // FIX: Añadir solo puertos que pertenecen al dispositivo actual
         if (c.from_device_id === d.id && c.a_port_id) deviceConnectedPorts.add(c.a_port_id);
         if (c.to_device_id === d.id && c.b_port_id) deviceConnectedPorts.add(c.b_port_id);
       });
@@ -50,7 +63,7 @@ async function getGraphByNetwork(req, res) {
       const ports = await Ports.listPortsByDevice(d.id);
       const enrichedPorts = ports.map(p => ({ ...p, connected: deviceConnectedPorts.has(p.id) }));
       const total = enrichedPorts.length;
-      const used = deviceConnectedPorts.size; // Ahora será correcto: 1 para dispositivo 145
+      const used = deviceConnectedPorts.size;
     
       return {
         id: d.id,
@@ -62,10 +75,12 @@ async function getGraphByNetwork(req, res) {
         location: d.location,
         image_id: d.image_id,
         site_id: d.site_id,
-        site_name: d.site_name || null,  // Añadido
+        site_path: d.site_path || null,
         metadata: tryParseMeta(d.metadata),
         ports: enrichedPorts,
-        ports_summary: { total, used }
+        ports_summary: { total, used },
+        ghost: !!d.ghost,
+        invisible: !!d.invisible 
       };
     });
     let nodes = await Promise.all(nodesPromises);
@@ -80,6 +95,14 @@ async function getGraphByNetwork(req, res) {
       a_port_name: c.a_port_name,
       b_port_name: c.b_port_name
     }));
+
+    if (site_id) {
+      const siteNodeIds = new Set(filteredDevices.map(d => d.id));
+      edges = edges.filter(e => siteNodeIds.has(e.source));
+      const externalTargets = new Set(edges.map(e => e.target).filter(id => !siteNodeIds.has(id)));
+      const externalNodes = devices.filter(d => externalTargets.has(d.id)).map(d => ({ ...d, ghost: true, invisible: true }));
+      filteredDevices = [...filteredDevices, ...externalNodes];
+    }
 
     const pred = makeKindPredicate(kind);
     if (pred) {
@@ -100,6 +123,7 @@ async function getGraphByNetwork(req, res) {
     return res.status(500).json({ error: 'Error interno' });
   }
 }
+
 
 
 module.exports = { getGraphByNetwork };

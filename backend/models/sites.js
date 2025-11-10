@@ -1,8 +1,12 @@
 const { getPool, query } = require('../db');
 
 async function listSitesByNetwork(networkId) {
-  // Incluir parent_id en la query
-  return await query('SELECT id, network_id, name, description, parent_id, created_at FROM sites WHERE network_id=? ORDER BY name', [networkId]);
+  const rows = await query('SELECT id, network_id, name, description, parent_id, created_at FROM sites WHERE network_id=? ORDER BY name', [networkId]);
+  
+  for (const row of rows) {
+    row.site_path = await getSitePath(row.id);
+  }
+  return rows;
 }
 
 async function getSiteById(id) {
@@ -32,4 +36,12 @@ async function deleteSite(id) {
   await getPool().execute('DELETE FROM sites WHERE id=?', [id]);
 }
 
-module.exports = { listSitesByNetwork, getSiteById, createSite, updateSite, deleteSite };
+async function getSitePath(siteId, path = []) {
+  const site = await getSiteById(siteId);
+  if (!site) return path.reverse().join(' > ');
+  path.push(site.name);
+  if (site.parent_id) return getSitePath(site.parent_id, path);
+  return path.reverse().join(' > ');
+}
+
+module.exports = { listSitesByNetwork, getSiteById, createSite, updateSite, deleteSite, getSitePath  };

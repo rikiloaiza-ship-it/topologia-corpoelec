@@ -41,10 +41,12 @@
   async function getGraph(networkId, opts = {}) {
     const params = new URLSearchParams();
     if (opts.kind) params.set('kind', opts.kind);
+    if (opts.site_id) params.set('site_id', opts.site_id); 
     const qs = params.toString();
     const path = '/networks/' + encodeURIComponent(networkId) + '/graph' + (qs ? ('?' + qs) : '');
     return fetchJson(path);
   }
+
   async function createDevice(data) {
     const res = await Auth.apiFetch('/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
     if (!res.ok) throw new Error('Error creando dispositivo');

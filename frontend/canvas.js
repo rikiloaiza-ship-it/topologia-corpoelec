@@ -128,7 +128,6 @@
         }
       }
       const p = meta.pos || meta.position || (hasNum(n.x) && hasNum(n.y) ? { x: n.x, y: n.y } : null);
-      // FIX: propagar ports y derivar ports_summary de ser necesario
       const portsArr = Array.isArray(n.ports) ? n.ports : [];
       const derivedSummary = {
         total: portsArr.length,
@@ -145,12 +144,13 @@
           ip: n.ip || '',
           mac: n.mac || '',
           network_id: n.network_id,
-          ghost: n.ghost === true ? 'true' : 'false',
           image_id: n.image_id || null,
           ports: portsArr.length ? portsArr : undefined,
           ports_summary: finalSummary,
-          site_name: n.site_name || null, 
-          site_id: n.site_id || null  
+          site_path: n.site_path || null,
+          site_id: n.site_id || null,
+          ghost: n.ghost ? 'true' : 'false',
+          invisible: n.invisible ? 'true' : 'false'  
         },
         position: p && hasNum(p.x) && hasNum(p.y) ? { x: Number(p.x), y: Number(p.y) } : undefined
       };
@@ -178,7 +178,7 @@
         style: {
           'width': 36, 'height': 36, 'shape': 'ellipse',
           'background-color': '#bdc3c7', 'border-width': 2, 'border-color': '#95a5a6',
-          'label': 'data(label)', 'font-size': 10, 'font-weight': 600, 'color': isDark ? '#ffffff' : '#2c3e50',  // Blanco en oscuro, gris en claro
+          'label': 'data(label)', 'font-size': 10, 'font-weight': 600, 'color': isDark ? '#ffffff' : '#2c3e50',
           'text-wrap': 'wrap', 'text-max-width': 100, 'text-valign': 'bottom', 'text-halign': 'center', 'text-margin-y': 8,
         }
       },
@@ -195,12 +195,18 @@
       { selector: 'node:hover',    style: { 'cursor': 'pointer' } },
       { selector: 'edge',
         style: {
-          'width': 2, 'line-color': isDark ? '#bdc3c7' : '#95a5a6',  // Gris claro en oscuro para mejor contraste
+          'width': 2, 'line-color': isDark ? '#bdc3c7' : '#95a5a6',   
           'curve-style': 'bezier', 'target-arrow-shape': 'none',
-          'label': 'data(label)', 'font-size': 8, 'text-rotation': 'autorotate', 'color': isDark ? '#ffffff' : '#34495e',  // Blanco en oscuro
+          'label': 'data(label)', 'font-size': 8, 'text-rotation': 'autorotate', 'color': isDark ? '#ffffff' : '#34495e',
           'text-margin-y': -5
         }
       },
+      { selector: 'node[invisible = "true"]',
+      style: {'opacity': 0, 
+              'width': 0, 
+              'height': 0 
+    }},
+
       { selector: 'node[image_id]',
         style: {
           'background-image': (ele) => `/api/images/${ele.data('image_id')}`,
@@ -310,10 +316,10 @@
     if (cy && cy.destroyed()) { cy = null; instances.delete(containerId); }
     
     if (!cy) {
-      const theme = document.documentElement.dataset.theme || 'light';  // Obtener tema actual
+      const theme = document.documentElement.dataset.theme || 'light'; 
       cy = cytoscape({
         container: el,
-        style: getEnhancedStyles(theme),  // Usar tema en estilos iniciales
+        style: getEnhancedStyles(theme),  
         wheelSensitivity: 0.2,
         boxSelectionEnabled: true,
         selectionType: 'single',
@@ -355,10 +361,8 @@
           const free = summary.total - summary.used;
           if (free > 0) {
             if (!window.selectedPortA) {
-              // Paso 1: Seleccionar puerto origen (A)
               window.openPortSelectionModal(d.id, 'A');
             } else {
-              // Paso 2: Seleccionar puerto destino (B)
               window.openPortSelectionModal(d.id, 'B');
             }
           } else {
@@ -366,7 +370,6 @@
           }
           return;
         }
-        // Lógica normal si no es modo conectar
       });
       
 
@@ -403,10 +406,11 @@
         const node = evt.target;
         const id = node.id();
         const position = node.position();
-       
-        API.updateDevice(id, { metadata: { pos: { x: position.x, y: position.y } } })
+        const siteId = cy.scratch('_graphMeta')?.siteId; 
+        const posKey = siteId ? `pos_site_${siteId}` : 'pos'; 
+        API.updateDevice(id, { metadata: { [posKey]: { x: position.x, y: position.y } } })
           .then(() => {
-            console.log(`Posición guardada para nodo ${id}: (${position.x}, ${position.y})`);
+            console.log(`Posición guardada para nodo ${id} en sede ${siteId || 'general'}: (${position.x}, ${position.y})`);
           })
           .catch(err => {
             console.error('Error guardando posición:', err);
@@ -423,7 +427,7 @@
     const cy = instances.get(containerId);
     if (cy) {
       const newStyle = getEnhancedStyles(theme);
-      cy.style(newStyle);  // Aplicar nuevos estilos dinámicamente
+      cy.style(newStyle); 
     }
   }
 
@@ -432,7 +436,7 @@
   function wireTooltips(cy) {
     cy.on('mouseover', 'node', (ev) => {
       const node = ev.target;
-      // FIX: usar la función detallada
+      if (node.data('ghost') === 'true' || node.data('invisible') === 'true') return; 
       const tooltip = portsSummary(node);
       showTooltip(tooltip, ev.originalEvent.clientX, ev.originalEvent.clientY);
     });
@@ -444,12 +448,13 @@
     const ports = d.ports || [];
     let summary = d.ports_summary || { total: ports.length, used: ports.filter(p => p.connected === true).length };
     const free = (summary.total || 0) - (summary.used || 0);
+
     let lines = [`${d.label || d.name || node.id()}`];
-    if (d.site_name) lines.push(`Sede: ${d.site_name}`);
+    if (d.site_path) lines.push(`Sede: ${d.site_path}`);
     else lines.push('Sin sede');
+
     lines.push(`Puertos: ${summary.total} total • ${summary.used || 0} usados • ${free} libres`);    if (ports && ports.length) {
       const topPorts = ports.slice(0, 10).map(p => {
-        // FIX: Solo usar connected para determinar usado
         const used = (p.connected === true) ? 'usado' : 'libre';
         const kind = p.kind?.replace(/-/g, ' ') || '';
         return `• ${p.name} (${kind}) — ${used}`;
@@ -475,7 +480,6 @@
       tip.style.borderRadius = '4px';
       tip.style.fontSize = '12px';
       tip.style.pointerEvents = 'none';
-      // FIX: respetar saltos de línea
       tip.style.whiteSpace = 'pre-line';
       document.body.appendChild(tip);
     }
@@ -490,7 +494,7 @@
     if (tip) tip.remove();
   }
 
-  function renderGraph(graph, opts = {}) {
+  function renderGraph(graph, opts = {}) {  
     const containerId = opts.containerId || 'canvas';
     const viewType = opts.viewType || 'all';
     const cy = ensure(containerId);
@@ -517,7 +521,8 @@
     cy.scratch('_graphMeta', { 
       network_id: graph.network_id, 
       kind: graph.kind || 'all',
-      viewType: viewType 
+      viewType: viewType,
+      siteId: opts.siteId 
     });
   }
 

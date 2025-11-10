@@ -1,10 +1,21 @@
 const { getPool, query } = require('../db');
 
 async function listDevicesByNetwork(networkId) {
-  return await query(
-    'SELECT d.id, d.network_id, d.name, d.ip_address, d.mac_address, d.device_type, d.location, d.image_id, d.metadata, d.site_id, s.name AS site_name, d.created_at, d.updated_at FROM devices d LEFT JOIN sites s ON d.site_id = s.id WHERE d.network_id=? ORDER BY d.id',
+  const rows = await query(
+    'SELECT d.id, d.network_id, d.name, d.ip_address, d.mac_address, d.device_type, d.location, d.image_id, d.metadata, d.site_id FROM devices d WHERE d.network_id=? ORDER BY d.id',
     [networkId]
   );
+  
+  const { getSitePath } = require('./sites');
+  for (const row of rows) {
+    if (row.site_id) {
+      row.site_path = await getSitePath(row.site_id);
+    } else {
+      row.site_path = null;
+    }
+  }
+  
+  return rows;
 }
 
 async function getDeviceById(id) {
