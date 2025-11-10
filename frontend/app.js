@@ -339,24 +339,66 @@
     const previewImg = document.getElementById('preview-img');
     const removeBtn = document.getElementById('remove-image');
     
+    // remove existing selector container to avoid duplicates
     const existingContainer = document.getElementById('site-selector-container');
     if (existingContainer) {
       existingContainer.remove();
     }
     
-    const sites = await API.getSites(networkId);
-    
-
+    // load sites
+    let sites = [];
+    try {
+      sites = await API.getSites(networkId);
+    } catch (err) {
+      console.error('Error cargando sedes para el modal:', err);
+      alert('No se pudo cargar las sedes. Intenta más tarde.');
+      return;
+    }
+  
+    // build DOM for site selector
     const siteContainer = document.createElement('div');
     siteContainer.id = 'site-selector-container';
     const siteLabel = document.createElement('label');
     siteLabel.textContent = 'Sede (con búsqueda y árbol)';
     const siteDiv = document.createElement('div');
-    siteDiv.id = 'device-site-tree'; 
+    siteDiv.id = 'device-site-tree'; // evita colisión con #site-tree
     siteContainer.appendChild(siteLabel);
     siteContainer.appendChild(siteDiv);
-
-
+  
+    // search input for the tree
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Buscar sede...';
+    searchInput.style.marginBottom = '10px';
+    siteContainer.insertBefore(searchInput, siteDiv);
+  
+    // insert site container after the location input if present, otherwise append to the form
+    const locationEl = document.getElementById('device-location');
+    if (locationEl && locationEl.parentNode) {
+      locationEl.insertAdjacentElement('afterend', siteContainer);
+    } else {
+      form.appendChild(siteContainer);
+    }
+  
+    // prepare tree data from sites
+    const treeData = sites.map(s => ({
+      id: String(s.id),
+      text: s.name,
+      parent: s.parent_id ? String(s.parent_id) : '#',
+      data: { site_id: s.id }
+    }));
+  
+    // destroy existing jstree instance if any (prevents duplicates / event stacking)
+    try {
+      const inst = $('#device-site-tree').jstree(true);
+      if (inst) {
+        $('#device-site-tree').jstree('destroy');
+      }
+    } catch (e) {
+      // ignore if not initialized
+    }
+  
+    // init jstree
     $('#device-site-tree').jstree({
       core: {
         data: treeData,
@@ -368,17 +410,13 @@
         show_only_matches_children: true
       }
     });
-
-    const searchInput = document.createElement('input');
-    searchInput.type = 'text';
-    searchInput.placeholder = 'Buscar sede...';
-    searchInput.style.marginBottom = '10px';
-    siteContainer.insertBefore(searchInput, siteDiv);
-    
+  
+    // wire search box to jstree
     searchInput.addEventListener('keyup', function() {
       $('#device-site-tree').jstree('search', this.value);
     });
-
+  
+    // selection handler: write hidden input site_id into the form
     $('#device-site-tree').on('select_node.jstree', function(e, data) {
       const selectedId = data.node.id;
       let hiddenField = document.getElementById('device-site-hidden');
@@ -391,33 +429,43 @@
       }
       hiddenField.value = selectedId;
     });
-
+  
+    // if editing existing device, select its site when tree is ready
     if (device && device.site_id) {
       $('#device-site-tree').on('ready.jstree', function() {
-        $('#device-site-tree').jstree('select_node', device.site_id.toString());
+        try {
+          $('#device-site-tree').jstree('select_node', String(device.site_id));
+        } catch (_) {}
       });
     }
-    
+  
+    // image preview handlers (keep as before)
     if (device && device.image_id) {
       previewImg.src = `/api/images/${device.image_id}`;
       previewDiv.style.display = 'block';
-      imageInput.value = '';
+      if (imageInput) imageInput.value = '';
     } else {
       previewDiv.style.display = 'none';
     }
-    imageInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = () => { previewImg.src = reader.result; previewDiv.style.display = 'block'; };
-        reader.readAsDataURL(file);
-      }
-    });
-    removeBtn.addEventListener('click', () => {
-      imageInput.value = '';
-      previewDiv.style.display = 'none';
-    });
-    
+  
+    if (imageInput) {
+      imageInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = () => { previewImg.src = reader.result; previewDiv.style.display = 'block'; };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+    if (removeBtn) {
+      removeBtn.addEventListener('click', () => {
+        if (imageInput) imageInput.value = '';
+        previewDiv.style.display = 'none';
+      });
+    }
+  
+    // fill form fields when editing
     if (device) {
       console.log('Device data:', device);
       if (title) title.textContent = 'Editar Dispositivo';
@@ -435,8 +483,10 @@
           if (portsCountEl) portsCountEl.value = ports.length;
           if (portsTypeEl) portsTypeEl.value = ports[0].kind || 'gigabit-ethernet';
         } else {
-          document.getElementById('device-ports-count').value = '';
-          document.getElementById('device-ports-type').value = 'gigabit-ethernet';
+          const pc = document.getElementById('device-ports-count');
+          if (pc) pc.value = '';
+          const pt = document.getElementById('device-ports-type');
+          if (pt) pt.value = 'gigabit-ethernet';
         }
       } catch (err) {
         console.error('Error cargando puertos:', err);
@@ -446,6 +496,7 @@
       if (form) form.reset();
       const idEl = document.getElementById('device-id'); if (idEl) idEl.value = '';
     }
+  
     if (modal) { modal.hidden = false; modal.setAttribute('aria-hidden', 'false'); }
   }
   
