@@ -21,11 +21,6 @@
   function getStoredTheme() { try { return localStorage.getItem(THEME_KEY); } catch { return null; } }
   function getSystemTheme() { const m = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null; return (m && m.matches) ? 'dark' : 'light'; }
 
-  (function initThemeFromStorage() {
-    const stored = getStoredTheme();
-    const theme = stored || getSystemTheme();
-    try { root.dataset.theme = theme; root.style.colorScheme = theme; } catch (e) {}
-  })();
 
   function setStatus(text, isError) {
     try {
@@ -357,34 +352,23 @@
     const siteLabel = document.createElement('label');
     siteLabel.textContent = 'Sede (con búsqueda y árbol)';
     const siteDiv = document.createElement('div');
-    siteDiv.id = 'site-tree';
+    siteDiv.id = 'device-site-tree'; 
     siteContainer.appendChild(siteLabel);
     siteContainer.appendChild(siteDiv);
-    
 
-    const locationEl = document.getElementById('device-location');
-    locationEl.insertAdjacentElement('afterend', siteContainer);
-    
 
-    const treeData = sites.map(s => ({
-      id: s.id.toString(),
-      text: s.name,
-      parent: s.parent_id ? s.parent_id.toString() : '#', 
-      data: { site_id: s.id } 
-    }));
-    
-    $('#site-tree').jstree({
+    $('#device-site-tree').jstree({
       core: {
         data: treeData,
         themes: { responsive: true }
       },
-      plugins: ['search'], 
+      plugins: ['search'],
       search: {
         show_only_matches: true,
         show_only_matches_children: true
       }
     });
-    
+
     const searchInput = document.createElement('input');
     searchInput.type = 'text';
     searchInput.placeholder = 'Buscar sede...';
@@ -392,10 +376,10 @@
     siteContainer.insertBefore(searchInput, siteDiv);
     
     searchInput.addEventListener('keyup', function() {
-      $('#site-tree').jstree('search', this.value);
+      $('#device-site-tree').jstree('search', this.value);
     });
-    
-    $('#site-tree').on('select_node.jstree', function(e, data) {
+
+    $('#device-site-tree').on('select_node.jstree', function(e, data) {
       const selectedId = data.node.id;
       let hiddenField = document.getElementById('device-site-hidden');
       if (!hiddenField) {
@@ -407,10 +391,10 @@
       }
       hiddenField.value = selectedId;
     });
-    
+
     if (device && device.site_id) {
-      $('#site-tree').on('ready.jstree', function() {
-        $('#site-tree').jstree('select_node', device.site_id.toString());
+      $('#device-site-tree').on('ready.jstree', function() {
+        $('#device-site-tree').jstree('select_node', device.site_id.toString());
       });
     }
     
@@ -801,17 +785,14 @@ async function computeNodePortsSummary(deviceId) {
   }
 }
 
-function isWifiType(t) {
-  t = String(t || '').toLowerCase().trim();
-  return ['ap','wifi','router','gateway','controller','repeater','access_point','ap_wifi','wireless_ap','wifi_ap','ap-bridge'].includes(t);
-}
-function isSwitchType(t) {
-  t = String(t || '').toLowerCase().trim();
-  return ['switch','core_switch','distribution_switch','access_switch','layer2_switch','layer3_switch','l2_switch','l3_switch'].includes(t);
-}
+
 function nodeCategory(type) {
-  if (isWifiType(type)) return 'wifi';
-  if (isSwitchType(type)) return 'switch';
+  if (window.Canvas && typeof window.Canvas.nodeCategory === 'function') {
+    return window.Canvas.nodeCategory(type);
+  }
+  const t = String(type || '').toLowerCase().trim();
+  if (['ap','wifi','router','gateway','controller','repeater','access_point','ap_wifi','wireless_ap','wifi_ap','ap-bridge'].includes(t)) return 'wifi';
+  if (['switch','core_switch','distribution_switch','access_switch','layer2_switch','layer3_switch','l2_switch','l3_switch'].includes(t)) return 'switch';
   return 'other';
 }
 
@@ -857,7 +838,7 @@ function projectGraphForView(full, view, opts = {}) {
     kind: desired,
     nodes: viewNodes,
     edges: viewEdges,
-    counts: { nodes: viewNodes.length, edges: viewNodes.length }
+    counts: { nodes: viewNodes.length, edges: viewEdges.length } 
   };
 }
 

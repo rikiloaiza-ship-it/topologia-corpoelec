@@ -331,9 +331,6 @@
         panningEnabled: true,
         zoomingEnabled: true
       });
-  
-      cy.on('wheel', (event) => {
-      });
 
       cy.on('grab', 'node', function(evt) {
         evt.target.trigger('grabon');
@@ -351,11 +348,12 @@
       };
       const debounced = debounce(onResize, 120);
       window.addEventListener('resize', debounced);
+
+      try { cy.scratch('_cleanup', { debounced }); } catch (_) {}
   
       cy.on('tap', 'node', ev => {
         const d = ev.target.data();
-        console.log('Nodo clickeado:', d);
-        
+        //console.log('Nodo clickeado:', d);
         if (window.connectMode) {
           const summary = d.ports_summary || { total: 0, used: 0 };
           const free = summary.total - summary.used;
@@ -370,8 +368,7 @@
           }
           return;
         }
-      });
-      
+      });      
 
       cy.on('cxttap', 'node', ev => {
         ev.originalEvent.preventDefault();
@@ -551,6 +548,7 @@
     fitView, 
     toggleBackground, 
     searchNodes,
-    updateTheme
+    updateTheme,
+    nodeCategory 
   };
 })(window);

@@ -1,6 +1,6 @@
 (function (global) {
-  async function fetchJson(path) {
-    const res = await Auth.apiFetch(path, { method: 'GET' });
+  async function fetchJson(path, init = {}) {
+    const res = await Auth.apiFetch(path, init);
     if (!res.ok) {
       const msg = await safeMsg(res);
       throw new Error(msg || ('Error HTTP ' + res.status));
@@ -13,10 +13,8 @@
   }
 
   async function getDevices(networkId) {
-    const res = await Auth.apiFetch(`/devices?network_id=${networkId}`);
-    if (!res.ok) throw new Error('Error obteniendo dispositivos');
-    const json = await res.json();
-    return json.data;
+    const json = await fetchJson(`/devices?network_id=${encodeURIComponent(networkId)}`);
+    return json.data || [];
   }
 
   async function getConnections(networkId) {
@@ -25,23 +23,19 @@
   }
 
   async function getDevice(id) {
-    const res = await Auth.apiFetch(`/devices/${id}`);
-    if (!res.ok) throw new Error('Error obteniendo dispositivo');
-    const json = await res.json();
-    return json.data; 
+    const json = await fetchJson(`/devices/${encodeURIComponent(id)}`);
+    return json.data;
   }
   
   async function getConnection(id) {
-    const res = await Auth.apiFetch(`/connections/${id}`);
-    if (!res.ok) throw new Error('Error obteniendo conexión');
-    const json = await res.json();
+    const json = await fetchJson(`/connections/${encodeURIComponent(id)}`);
     return json.data;  
   }
 
   async function getGraph(networkId, opts = {}) {
     const params = new URLSearchParams();
     if (opts.kind) params.set('kind', opts.kind);
-    if (opts.site_id) params.set('site_id', opts.site_id); 
+    if (opts.site_id) params.set('site_id', String(opts.site_id)); 
     const qs = params.toString();
     const path = '/networks/' + encodeURIComponent(networkId) + '/graph' + (qs ? ('?' + qs) : '');
     return fetchJson(path);
@@ -54,13 +48,13 @@
   }
   
   async function updateDevice(id, data) {
-    const res = await Auth.apiFetch(`/devices/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    const res = await Auth.apiFetch(`/devices/${encodeURIComponent(id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
     if (!res.ok) throw new Error('Error actualizando dispositivo');
     return res.json();
   }
   
   async function deleteDevice(id) {
-    const res = await Auth.apiFetch(`/devices/${id}`, { 
+    const res = await Auth.apiFetch(`/devices/${encodeURIComponent(id)}`, { 
       method: 'DELETE',
       headers: { 'Cache-Control': 'no-cache' } 
     });
@@ -80,18 +74,19 @@
   async function upsertPorts(deviceId, ports) {
     const data = await fetchJson('/devices/' + encodeURIComponent(deviceId) + '/ports', {
       method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ports })
     });
     return data.data || [];
   }
   async function updateConnection(id, data) {
-    const res = await Auth.apiFetch(`/connections/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    const res = await Auth.apiFetch(`/connections/${encodeURIComponent(id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
     if (!res.ok) throw new Error('Error actualizando conexión');
     return res.json();
   }
   
   async function deleteConnection(id) {
-    const res = await Auth.apiFetch(`/connections/${id}`, { 
+    const res = await Auth.apiFetch(`/connections/${encodeURIComponent(id)}`, { 
       method: 'DELETE',
       headers: { 'Cache-Control': 'no-cache' } 
     });
