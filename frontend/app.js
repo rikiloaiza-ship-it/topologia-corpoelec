@@ -262,10 +262,8 @@
     const detailsClose2 = document.getElementById('details-close-2');
     detailsClose?.addEventListener('click', () => closeModal(detailsModal));
     detailsClose2?.addEventListener('click', () => closeModal(detailsModal));
-    // Cerrar al hacer click en el backdrop
     const detailsBackdrop = detailsModal?.querySelector('.modal-backdrop');
     detailsBackdrop?.addEventListener('click', (ev) => {
-      // evita cerrar si el click fue dentro del panel (por si bubblea)
       closeModal(detailsModal);
     });
   }
@@ -283,7 +281,7 @@
   function bindContextMenuActions() {
     const editBtn = document.getElementById('edit-btn');
     const deleteBtn = document.getElementById('delete-btn');
-    const detailsBtn = document.getElementById('details-btn'); // ← nuevo
+    const detailsBtn = document.getElementById('details-btn'); 
 
     if (editBtn) {
       editBtn.addEventListener('click', async function() {
@@ -365,87 +363,146 @@
     }
   }
 
-  async function openDetailsModal(deviceId) {
-    const modal = document.getElementById('details-modal');
-    const imageWrap = document.getElementById('details-image');
-    const generalWrap = document.getElementById('details-general');
-    const summaryWrap = document.getElementById('details-ports-summary');
-    const listWrap = document.getElementById('details-ports-list');
-  
-    if (imageWrap) imageWrap.innerHTML = '';
-    if (generalWrap) generalWrap.innerHTML = '';
-    if (summaryWrap) summaryWrap.innerHTML = '';
-    if (listWrap) listWrap.innerHTML = '';
-  
+async function openDetailsModal(deviceId) {
+  const modal = document.getElementById('details-modal');
+  const imageWrap = document.getElementById('details-image');
+  const generalWrap = document.getElementById('details-general');
+  const summaryWrap = document.getElementById('details-ports-summary');
+  const listWrap = document.getElementById('details-ports-list');
+
+  if (imageWrap) imageWrap.innerHTML = '';
+  if (generalWrap) generalWrap.innerHTML = '';
+  if (summaryWrap) summaryWrap.innerHTML = '';
+  if (listWrap) listWrap.innerHTML = '';
+
+  try {
+    const device = await API.getDevice(deviceId);
+    const ports = await API.getPorts(deviceId);
+
+    const networkId = parseInt(new URLSearchParams(location.search).get('network_id') || '1', 10);
+    let connections = [];
     try {
-      const device = await API.getDevice(deviceId);
-      const ports = await API.getPorts(deviceId); // array de puertos
-      const total = ports.length;
-      const used = ports.filter(p => p.connected === true).length;
-      const free = total - used;
-  
-      if (imageWrap) {
-        if (device.image_id) {
-          const img = document.createElement('img');
-          img.src = `/api/images/${device.image_id}`;
-          img.alt = device.name || 'Imagen dispositivo';
-          img.style.maxWidth = '110px';
-          img.style.borderRadius = '8px';
-          img.style.border = '1px solid var(--border)';
-          imageWrap.appendChild(img);
-        } else {
-          imageWrap.innerHTML = '<div style="color:var(--muted); font-size:13px;">Sin imagen</div>';
-        }
-      }
-  
-      if (generalWrap) {
-        const nameEl = `<div style="font-weight:700; font-size:16px;">${escapeHtml(device.name || '—')}</div>`;
-        const ipEl = `<div style="color:var(--muted)">IP: ${escapeHtml(device.ip_address || '—')}</div>`;
-        const other = `<div style="margin-top:6px; font-size:13px;">
-          Tipo: ${escapeHtml(device.device_type || '—')} • MAC: ${escapeHtml(device.mac_address || '—')}
-          <div style="margin-top:4px;">Ubicación: ${escapeHtml(device.location || '—')}</div>
-        </div>`;
-        generalWrap.innerHTML = nameEl + ipEl + other;
-      }
-  
-      if (summaryWrap) {
-        summaryWrap.innerHTML = `<strong>Puertos</strong>: ${total} total • ${used} conectados • ${free} libres`;
-      }
-  
-      if (listWrap) {
-        if (!ports || ports.length === 0) {
-          listWrap.innerHTML = `<div style="color:var(--muted)">No hay puertos registrados.</div>`;
-        } else {
-          const ul = document.createElement('ul');
-          ul.style.listStyle = 'none';
-          ul.style.padding = '0';
-          ul.style.margin = '0';
-          ports.forEach(p => {
-            const li = document.createElement('li');
-            li.style.padding = '6px 0';
-            li.style.borderBottom = '1px dashed rgba(0,0,0,0.06)';
-            const status = p.connected ? 'Usado' : 'Libre';
-            let connInfo = '';
-            if (p.connected && p.connection_to) {
-              connInfo = ` • Conectado a ${escapeHtml(String(p.connection_to) || p.remote_device || '—')}`;
-            } else if (p.connected && (p.a_connection || p.b_connection)) {
-              connInfo = ` • ${escapeHtml(String(p.a_connection || p.b_connection))}`;
-            } else if (p.connected && p.peer) {
-              connInfo = ` • ${escapeHtml(String(p.peer))}`;
-            }
-            li.innerHTML = `<strong>${escapeHtml(p.name)}</strong> — ${escapeHtml(p.kind || '')} — ${status}${connInfo}`;
-            ul.appendChild(li);
-          });
-          listWrap.appendChild(ul);
-        }
-      }
-  
-      if (modal) { modal.hidden = false; modal.setAttribute('aria-hidden', 'false'); }
-    } catch (err) {
-      console.error('openDetailsModal error', err);
-      alert('No se pudo obtener detalles del dispositivo: ' + (err?.message || 'error'));
+      connections = await API.getConnections(networkId);
+    } catch (e) {
+      console.warn('No se pudieron cargar conexiones de la red, se usará solo info de puertos:', e);
     }
+
+    const portConnMap = new Map();
+    (connections || []).forEach(conn => {
+      if (conn.a_port_id) {
+        portConnMap.set(Number(conn.a_port_id), {
+          peerDeviceId: conn.to_device_id,
+          peerPortName: conn.b_port_name || null,
+          connection: conn
+        });
+      }
+      if (conn.b_port_id) {
+        portConnMap.set(Number(conn.b_port_id), {
+          peerDeviceId: conn.from_device_id,
+          peerPortName: conn.a_port_name || null,
+          connection: conn
+        });
+      }
+    });
+
+    const peerDeviceIds = new Set();
+    const portsEnhanced = (ports || []).map(p => {
+      const copy = Object.assign({}, p);
+      const pm = portConnMap.get(Number(p.id));
+      if (pm) {
+        copy.connected = true;
+        copy.peerDeviceId = pm.peerDeviceId;
+        copy.peerPortName = pm.peerPortName;
+        if (pm.peerDeviceId) peerDeviceIds.add(pm.peerDeviceId);
+      } else {
+        copy.connected = !!p.connected;
+      }
+      return copy;
+    });
+
+    const deviceNameById = {};
+    if (peerDeviceIds.size > 0) {
+      const promises = Array.from(peerDeviceIds).map(async (id) => {
+        try {
+          const d = await API.getDevice(id);
+          deviceNameById[id] = d?.name || String(id);
+        } catch (e) {
+          deviceNameById[id] = String(id);
+        }
+      });
+      await Promise.all(promises);
+    }
+
+    const total = portsEnhanced.length;
+    const used = portsEnhanced.filter(p => p.connected === true).length;
+    const free = total - used;
+
+    if (imageWrap) {
+      if (device.image_id) {
+        const img = document.createElement('img');
+        img.src = `/api/images/${device.image_id}`;
+        img.alt = device.name || 'Imagen dispositivo';
+        img.style.maxWidth = '110px';
+        img.style.borderRadius = '8px';
+        img.style.border = '1px solid var(--border)';
+        imageWrap.appendChild(img);
+      } else {
+        imageWrap.innerHTML = '<div style="color:var(--muted); font-size:13px;">Sin imagen</div>';
+      }
+    }
+
+    if (generalWrap) {
+      const nameEl = `<div style="font-weight:700; font-size:16px;">${escapeHtml(device.name || '—')}</div>`;
+      const ipEl = `<div style="color:var(--muted)">IP: ${escapeHtml(device.ip_address || '—')}</div>`;
+      const other = `<div style="margin-top:6px; font-size:13px;">
+        Tipo: ${escapeHtml(device.device_type || '—')} • MAC: ${escapeHtml(device.mac_address || '—')}
+        <div style="margin-top:4px;">Ubicación: ${escapeHtml(device.location || '—')}</div>
+      </div>`;
+      generalWrap.innerHTML = nameEl + ipEl + other;
+    }
+
+    if (summaryWrap) {
+      summaryWrap.innerHTML = `<strong>Puertos</strong>: ${total} total • ${used} conectados • ${free} libres`;
+    }
+
+    if (listWrap) {
+      if (!portsEnhanced || portsEnhanced.length === 0) {
+        listWrap.innerHTML = `<div style="color:var(--muted)">No hay puertos registrados.</div>`;
+      } else {
+        const ul = document.createElement('ul');
+        ul.style.listStyle = 'none';
+        ul.style.padding = '0';
+        ul.style.margin = '0';
+        portsEnhanced.forEach(p => {
+          const li = document.createElement('li');
+          li.style.padding = '6px 0';
+          li.style.borderBottom = '1px dashed rgba(0,0,0,0.06)';
+          const status = p.connected ? 'Usado' : 'Libre';
+          let connInfo = '';
+          if (p.connected) {
+            if (p.peerDeviceId) {
+              const peerName = deviceNameById[p.peerDeviceId] || String(p.peerDeviceId);
+              const peerPort = p.peerPortName ? ` — ${escapeHtml(p.peerPortName)}` : '';
+              connInfo = ` • Conectado a ${escapeHtml(peerName)}${peerPort}`;
+            } else {
+              if (p.connection_to) connInfo = ` • Conectado a ${escapeHtml(String(p.connection_to))}`;
+              else if (p.remote_device) connInfo = ` • Conectado a ${escapeHtml(String(p.remote_device))}`;
+              else if (p.peer) connInfo = ` • Conectado a ${escapeHtml(String(p.peer))}`;
+            }
+          }
+          li.innerHTML = `<strong>${escapeHtml(p.name)}</strong> — ${escapeHtml(p.kind || '')} — ${status}${connInfo}`;
+          ul.appendChild(li);
+        });
+        listWrap.appendChild(ul);
+      }
+    }
+
+    if (modal) { modal.hidden = false; modal.setAttribute('aria-hidden', 'false'); }
+  } catch (err) {
+    console.error('openDetailsModal error', err);
+    alert('No se pudo obtener detalles del dispositivo: ' + (err?.message || 'error'));
   }
+}
 
   function escapeHtml(s) {
     if (s === null || s === undefined) return '';
@@ -467,13 +524,11 @@
     const previewImg = document.getElementById('preview-img');
     const removeBtn = document.getElementById('remove-image');
     
-    // remove existing selector container to avoid duplicates
     const existingContainer = document.getElementById('site-selector-container');
     if (existingContainer) {
       existingContainer.remove();
     }
     
-    // load sites
     let sites = [];
     try {
       sites = await API.getSites(networkId);
@@ -483,24 +538,21 @@
       return;
     }
   
-    // build DOM for site selector
     const siteContainer = document.createElement('div');
     siteContainer.id = 'site-selector-container';
     const siteLabel = document.createElement('label');
     siteLabel.textContent = 'Sede (con búsqueda y árbol)';
     const siteDiv = document.createElement('div');
-    siteDiv.id = 'device-site-tree'; // evita colisión con #site-tree
+    siteDiv.id = 'device-site-tree'; 
     siteContainer.appendChild(siteLabel);
     siteContainer.appendChild(siteDiv);
   
-    // search input for the tree
     const searchInput = document.createElement('input');
     searchInput.type = 'text';
     searchInput.placeholder = 'Buscar sede...';
     searchInput.style.marginBottom = '10px';
     siteContainer.insertBefore(searchInput, siteDiv);
   
-    // insert site container after the location input if present, otherwise append to the form
     const locationEl = document.getElementById('device-location');
     if (locationEl && locationEl.parentNode) {
       locationEl.insertAdjacentElement('afterend', siteContainer);
@@ -508,7 +560,6 @@
       form.appendChild(siteContainer);
     }
   
-    // prepare tree data from sites
     const treeData = sites.map(s => ({
       id: String(s.id),
       text: s.name,
@@ -516,17 +567,14 @@
       data: { site_id: s.id }
     }));
   
-    // destroy existing jstree instance if any (prevents duplicates / event stacking)
     try {
       const inst = $('#device-site-tree').jstree(true);
       if (inst) {
         $('#device-site-tree').jstree('destroy');
       }
     } catch (e) {
-      // ignore if not initialized
     }
   
-    // init jstree
     $('#device-site-tree').jstree({
       core: {
         data: treeData,
@@ -539,12 +587,10 @@
       }
     });
   
-    // wire search box to jstree
     searchInput.addEventListener('keyup', function() {
       $('#device-site-tree').jstree('search', this.value);
     });
   
-    // selection handler: write hidden input site_id into the form
     $('#device-site-tree').on('select_node.jstree', function(e, data) {
       const selectedId = data.node.id;
       let hiddenField = document.getElementById('device-site-hidden');
@@ -558,7 +604,6 @@
       hiddenField.value = selectedId;
     });
   
-    // if editing existing device, select its site when tree is ready
     if (device && device.site_id) {
       $('#device-site-tree').on('ready.jstree', function() {
         try {
@@ -567,7 +612,6 @@
       });
     }
   
-    // image preview handlers (keep as before)
     if (device && device.image_id) {
       previewImg.src = `/api/images/${device.image_id}`;
       previewDiv.style.display = 'block';
@@ -593,7 +637,6 @@
       });
     }
   
-    // fill form fields when editing
     if (device) {
       console.log('Device data:', device);
       if (title) title.textContent = 'Editar Dispositivo';
@@ -870,7 +913,6 @@ function getActiveContainerId() {
   
   return 'canvas-wifi'; 
 }
-  // --- helpers ---
   function detectPage() {
     const dp = document.body?.dataset?.page;
     if (dp) return dp.toLowerCase();
