@@ -878,3 +878,7 @@ input[type="password"] {
 #site-panel select {
   width: 100%;
 }
+
+#details-image img { display: block; width: 100%; height: auto; object-fit: cover; }
+#details-ports-list ul li { color: var(--text); font-size: 13px; }
+#details-ports-list ul li strong { margin-right: 8px; }

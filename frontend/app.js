@@ -256,6 +256,12 @@
     const confirmNo = document.getElementById('confirm-no');
     confirmYes?.addEventListener('click', handleConfirmYes);
     confirmNo?.addEventListener('click', () => closeModal(confirmModal));
+  
+    const detailsModal = document.getElementById('details-modal');
+    const detailsClose = document.getElementById('details-close');
+    const detailsClose2 = document.getElementById('details-close-2');
+    detailsClose?.addEventListener('click', () => closeModal(detailsModal));
+    detailsClose2?.addEventListener('click', () => closeModal(detailsModal));
   }
 
   function bindLogoutButton() {
@@ -271,6 +277,7 @@
   function bindContextMenuActions() {
     const editBtn = document.getElementById('edit-btn');
     const deleteBtn = document.getElementById('delete-btn');
+    const detailsBtn = document.getElementById('details-btn'); // ← nuevo
 
     if (editBtn) {
       editBtn.addEventListener('click', async function() {
@@ -327,6 +334,121 @@
         }
       });
     }
+    
+    if (detailsBtn) {
+      detailsBtn.addEventListener('click', async function() {
+        const menu = document.getElementById('context-menu');
+        const type = menu?.dataset?.type;
+        const id = menu?.dataset?.id;
+        hideContextMenu();
+        if (!type || !id) {
+          alert('Tipo o ID no definidos en el menú de contexto');
+          return;
+        }
+        if (type !== 'device') {
+          alert('Detalles sólo disponibles para dispositivos');
+          return;
+        }
+        try {
+          await openDetailsModal(id);
+        } catch (err) {
+          console.error('Error mostrando detalles:', err);
+          alert('Error cargando detalles: ' + (err?.message || 'desconocido'));
+        }
+      });
+    }
+  }
+
+  async function openDetailsModal(deviceId) {
+    const modal = document.getElementById('details-modal');
+    const imageWrap = document.getElementById('details-image');
+    const generalWrap = document.getElementById('details-general');
+    const summaryWrap = document.getElementById('details-ports-summary');
+    const listWrap = document.getElementById('details-ports-list');
+  
+    if (imageWrap) imageWrap.innerHTML = '';
+    if (generalWrap) generalWrap.innerHTML = '';
+    if (summaryWrap) summaryWrap.innerHTML = '';
+    if (listWrap) listWrap.innerHTML = '';
+  
+    try {
+      const device = await API.getDevice(deviceId);
+      const ports = await API.getPorts(deviceId); // array de puertos
+      const total = ports.length;
+      const used = ports.filter(p => p.connected === true).length;
+      const free = total - used;
+  
+      if (imageWrap) {
+        if (device.image_id) {
+          const img = document.createElement('img');
+          img.src = `/api/images/${device.image_id}`;
+          img.alt = device.name || 'Imagen dispositivo';
+          img.style.maxWidth = '110px';
+          img.style.borderRadius = '8px';
+          img.style.border = '1px solid var(--border)';
+          imageWrap.appendChild(img);
+        } else {
+          imageWrap.innerHTML = '<div style="color:var(--muted); font-size:13px;">Sin imagen</div>';
+        }
+      }
+  
+      if (generalWrap) {
+        const nameEl = `<div style="font-weight:700; font-size:16px;">${escapeHtml(device.name || '—')}</div>`;
+        const ipEl = `<div style="color:var(--muted)">IP: ${escapeHtml(device.ip_address || '—')}</div>`;
+        const other = `<div style="margin-top:6px; font-size:13px;">
+          Tipo: ${escapeHtml(device.device_type || '—')} • MAC: ${escapeHtml(device.mac_address || '—')}
+          <div style="margin-top:4px;">Ubicación: ${escapeHtml(device.location || '—')}</div>
+        </div>`;
+        generalWrap.innerHTML = nameEl + ipEl + other;
+      }
+  
+      if (summaryWrap) {
+        summaryWrap.innerHTML = `<strong>Puertos</strong>: ${total} total • ${used} conectados • ${free} libres`;
+      }
+  
+      if (listWrap) {
+        if (!ports || ports.length === 0) {
+          listWrap.innerHTML = `<div style="color:var(--muted)">No hay puertos registrados.</div>`;
+        } else {
+          const ul = document.createElement('ul');
+          ul.style.listStyle = 'none';
+          ul.style.padding = '0';
+          ul.style.margin = '0';
+          ports.forEach(p => {
+            const li = document.createElement('li');
+            li.style.padding = '6px 0';
+            li.style.borderBottom = '1px dashed rgba(0,0,0,0.06)';
+            const status = p.connected ? 'Usado' : 'Libre';
+            let connInfo = '';
+            if (p.connected && p.connection_to) {
+              connInfo = ` • Conectado a ${escapeHtml(String(p.connection_to) || p.remote_device || '—')}`;
+            } else if (p.connected && (p.a_connection || p.b_connection)) {
+              connInfo = ` • ${escapeHtml(String(p.a_connection || p.b_connection))}`;
+            } else if (p.connected && p.peer) {
+              connInfo = ` • ${escapeHtml(String(p.peer))}`;
+            }
+            li.innerHTML = `<strong>${escapeHtml(p.name)}</strong> — ${escapeHtml(p.kind || '')} — ${status}${connInfo}`;
+            ul.appendChild(li);
+          });
+          listWrap.appendChild(ul);
+        }
+      }
+  
+      if (modal) { modal.hidden = false; modal.setAttribute('aria-hidden', 'false'); }
+    } catch (err) {
+      console.error('openDetailsModal error', err);
+      alert('No se pudo obtener detalles del dispositivo: ' + (err?.message || 'error'));
+    }
+  }
+
+  function escapeHtml(s) {
+    if (s === null || s === undefined) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   async function openDeviceModal(device = null) {

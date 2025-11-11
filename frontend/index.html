@@ -105,13 +105,13 @@
 
     <div class="modal" id="device-modal" aria-hidden="true" role="dialog" aria-labelledby="device-title" aria-modal="true" hidden>
       <div class="modal-backdrop" data-close="modal"></div>
-      <div class="modal-dialog modal-dialog--device">  <!-- Añadí clase para styling específico -->
+      <div class="modal-dialog modal-dialog--device">  
         <button class="modal-close" id="device-close" aria-label="Cerrar">×</button>
         <h2 id="device-title">Agregar/Editar Dispositivo</h2>
-        <form id="device-form" autocomplete="off" class="form-grid">  <!-- Añadí clase para grid layout -->
+        <form id="device-form" autocomplete="off" class="form-grid">  
           <input type="hidden" id="device-id" />
     
-          <!-- Grupo: Información básica -->
+      
           <div class="form-group">
             <label for="device-name">Nombre</label>
             <input name="name" id="device-name" required />
@@ -126,7 +126,6 @@
             </select>
           </div>
     
-          <!-- Grupo: Redes -->
           <div class="form-group">
             <label for="device-ip">IP</label>
             <input name="ip_address" id="device-ip" type="text" />
@@ -137,14 +136,10 @@
             <input name="mac_address" id="device-mac" type="text" />
           </div>
     
-          <!-- Grupo: Ubicación -->
           <div class="form-group">
             <label for="device-location">Ubicación</label>
             <input name="location" id="device-location" type="text" />
           </div>
-          <!-- Aquí se inserta dinámicamente el site-selector-container (árbol de sedes) -->
-    
-          <!-- Grupo: Puertos -->
           <div class="form-group">
             <label for="device-ports-count">Número de Puertos</label>
             <input type="number" id="device-ports-count" min="0" max="48" />
@@ -253,8 +248,36 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <div id="context-menu" class="context-menu" hidden>
+    <button id="details-btn">Detalles</button>
     <button id="edit-btn">Editar</button>
     <button id="delete-btn">Eliminar</button>
+  </div>
+  
+  <div class="modal" id="details-modal" aria-hidden="true" role="dialog" aria-labelledby="details-title" aria-modal="true" hidden>
+    <div class="modal-backdrop" data-close="modal"></div>
+    <div class="modal-dialog modal-dialog--device">
+      <button class="modal-close" id="details-close" aria-label="Cerrar">×</button>
+      <h2 id="details-title">Detalles del Dispositivo</h2>
+  
+      <div id="details-content" style="display: grid; gap: 12px; grid-template-columns: 120px 1fr;">
+        <div id="details-image" style="min-width: 120px;">
+        </div>
+        <div id="details-main">
+          <div id="details-general" style="margin-bottom: 8px;">
+          </div>
+  
+          <div id="details-ports-summary" style="margin-bottom: 8px;">
+          </div>
+  
+          <div id="details-ports-list" style="max-height: 240px; overflow:auto; border-top:1px solid var(--border); padding-top:8px;">
+          </div>
+        </div>
+      </div>
+  
+      <div class="form-actions" style="margin-top: 14px;">
+        <button type="button" class="btn" id="details-close-2">Cerrar</button>
+      </div>
+    </div>
   </div>
 </body>
 </html>
