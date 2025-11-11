@@ -262,6 +262,12 @@
     const detailsClose2 = document.getElementById('details-close-2');
     detailsClose?.addEventListener('click', () => closeModal(detailsModal));
     detailsClose2?.addEventListener('click', () => closeModal(detailsModal));
+    // Cerrar al hacer click en el backdrop
+    const detailsBackdrop = detailsModal?.querySelector('.modal-backdrop');
+    detailsBackdrop?.addEventListener('click', (ev) => {
+      // evita cerrar si el click fue dentro del panel (por si bubblea)
+      closeModal(detailsModal);
+    });
   }
 
   function bindLogoutButton() {
